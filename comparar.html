@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Compara oportunidades inmobiliarias bajo los mismos supuestos con FincaLens."
+    />
+    <title>Comparador · FincaLens</title>
+    <link rel="icon" href="assets/brand.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body data-page="compare">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div id="app-shell"></div>
+    <div class="layout-main">
+      <div id="topbar"></div>
+      <main id="main" class="content">
+        <header class="page-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 8px">
+              DECIDE CON PERSPECTIVA
+            </div>
+            <h1>Pon tus opciones en contexto.</h1>
+            <p class="subtitle">
+              Tres inmuebles. Los mismos supuestos. Una comparación más clara.
+            </p>
+          </div>
+          <div class="head-actions">
+            <button class="btn" id="export-comparison">
+              <span data-icon="download"></span>Exportar CSV</button
+            ><a class="btn btn-primary" href="analizar.html"
+              ><span data-icon="plus"></span>Añadir inmueble</a
+            >
+          </div>
+        </header>
+        <div class="insight-banner">
+          <div class="insight-icon"><span data-icon="compare"></span></div>
+          <p>
+            <strong>Compara lo que realmente importa.</strong><br />Todos los
+            escenarios usan 80 % de financiación, 3,2 % a 30 años y gastos
+            operativos del 15 %.
+          </p>
+        </div>
+        <section
+          aria-label="Elegir inmuebles para comparar"
+          class="compare-selectors"
+          id="compare-selectors"
+        ></section>
+        <section
+          class="panel compare-table-wrap"
+          aria-labelledby="comparison-title"
+        >
+          <h2 class="sr-only" id="comparison-title">Comparación de métricas</h2>
+          <table class="table compare-table">
+            <caption class="sr-only">
+              Resultados financieros de tres inmuebles con supuestos
+              equivalentes
+            </caption>
+            <thead id="compare-head"></thead>
+            <tbody id="compare-body"></tbody>
+          </table>
+        </section>
+        <div class="compare-footer">
+          <span data-icon="info"></span>
+          <p>
+            El resaltado señala el mejor valor numérico de cada fila, no una
+            recomendación de compra. Datos ficticios. Impuesto ilustrativo del 6
+            % para todos los casos.
+          </p>
+        </div>
+        <div class="bottom-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Una rentabilidad alta no lo explica todo.</h2>
+              <span data-icon="spark"></span>
+            </div>
+            <p class="muted" style="font-size: 12px; line-height: 1.9">
+              El capital inicial, el estado del inmueble y el margen de
+              tesorería también cuentan. Abre cada informe para revisar los
+              supuestos y preparar las preguntas de tu visita.
+            </p>
+            <a class="text-link mt-sm" href="informe.html"
+              >Explorar un informe completo <span data-icon="arrow-right"></span
+            ></a>
+          </section>
+          <aside class="panel tip-panel">
+            <span class="eyebrow">UN CRITERIO, DIFERENTES ESCENARIOS</span>
+            <h2>Elige según<br />tu estrategia.</h2>
+            <p>
+              La mejor operación depende de tu capital y del riesgo que puedas
+              asumir.
+            </p>
+          </aside>
+        </div>
+        <div id="page-footer"></div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Vista previa del diseño de la extensión FincaLens para analizar anuncios inmobiliarios."
+    />
+    <title>Extensión · FincaLens</title>
+    <link rel="icon" href="assets/brand.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body data-page="extension">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div id="app-shell"></div>
+    <div class="layout-main">
+      <div id="topbar"></div>
+      <main id="main" class="content">
+        <header class="page-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 8px">
+              TU ANÁLISIS, DONDE LO NECESITAS
+            </div>
+            <h1>Una nueva lente para Idealista.</h1>
+            <p class="subtitle">
+              Vista previa del diseño de la extensión. Todavía no instalable.
+            </p>
+          </div>
+          <span class="tag tag-warning">En diseño</span>
+        </header>
+        <section class="extension-hero">
+          <div>
+            <span class="source-pill"
+              ><span data-icon="puzzle"></span>FINCALENS PARA CHROME</span
+            >
+            <h2>
+              Abre un anuncio.<br />Descubre lo que<br />hay detrás del precio.
+            </h2>
+            <p>
+              Guarda oportunidades, detecta cambios y lleva los números contigo
+              mientras buscas tu próxima inversión.
+            </p>
+            <a class="btn btn-dark" href="#extension-preview"
+              >Explorar el panel <span data-icon="arrow-right"></span
+            ></a>
+            <p style="font-size: 9px; margin: 12px 0 0">
+              Prototipo visual · Sin acceso a tu navegación
+            </p>
+          </div>
+          <div
+            class="browser-mock"
+            aria-label="Ejemplo ilustrativo del panel dentro de un anuncio"
+          >
+            <div class="browser-bar">
+              <span class="browser-dot"></span><span class="browser-dot"></span
+              ><span class="browser-dot"></span
+              ><span class="address-bar">idealista.com/inmueble/ejemplo</span
+              ><span data-icon="puzzle"></span>
+            </div>
+            <div class="browser-body">
+              <div class="browser-property">
+                <img
+                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&amp;fit=crop&amp;w=320&amp;q=80"
+                  alt="Fotografía ilustrativa de vivienda"
+                />
+                <div>
+                  <h3>Piso en Calle del Mar</h3>
+                  <p>El Cabanyal, Valencia</p>
+                  <strong>185.000 €</strong>
+                  <p>72 m² · 2 hab. · 2ª planta</p>
+                </div>
+              </div>
+              <div class="browser-analysis">
+                <div class="brand">
+                  <span class="brand-mark"><span data-icon="house"></span></span
+                  >FincaLens
+                </div>
+                <p>
+                  El precio es solo una parte de la historia.<br />Explora la
+                  inversión completa.
+                </p>
+                <a class="btn btn-primary btn-sm full" href="informe.html"
+                  >Ver informe de ejemplo <span data-icon="arrow-right"></span
+                ></a>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="extension-features" aria-label="Capacidades previstas">
+          <article class="feature-tile">
+            <span data-icon="bookmark"></span>
+            <h3>Tu cartera, a un clic.</h3>
+            <p>
+              Guarda inmuebles mientras navegas y vuelve a ellos cuando quieras
+              comparar.
+            </p>
+          </article>
+          <article class="feature-tile">
+            <span data-icon="trend-down"></span>
+            <h3>Los cambios, a la vista.</h3>
+            <p>
+              Consulta las variaciones de los precios que hayas observado al
+              visitar un anuncio.
+            </p>
+          </article>
+          <article class="feature-tile">
+            <span data-icon="file"></span>
+            <h3>Los números completos.</h3>
+            <p>
+              Del anuncio al informe: costes, financiación, escenarios y
+              checklist de visita.
+            </p>
+          </article>
+        </section>
+        <section class="extension-demo-layout" id="extension-preview">
+          <div class="panel">
+            <span class="eyebrow">ASÍ SERÁ TU PUNTO DE PARTIDA</span>
+            <h2 class="mt-sm">
+              Un panel pequeño.<br />Una perspectiva más amplia.
+            </h2>
+            <p class="muted mt-sm" style="font-size: 12px; line-height: 1.9">
+              Esta vista representa el panel de FincaLens al abrir un anuncio.
+              Prueba a guardar la vivienda de ejemplo o entra en su informe
+              interactivo.
+            </p>
+            <div class="aside-divider"></div>
+            <ol class="info-steps">
+              <li>
+                <i>1</i>
+                <div>
+                  <strong>Detectar el inmueble</strong>
+                  <p>Mostrar los datos esenciales y su procedencia.</p>
+                </div>
+              </li>
+              <li>
+                <i>2</i>
+                <div>
+                  <strong>Guardar o analizar</strong>
+                  <p>Una acción rápida para cada momento de tu búsqueda.</p>
+                </div>
+              </li>
+              <li>
+                <i>3</i>
+                <div>
+                  <strong>Decidir con contexto</strong>
+                  <p>
+                    Abrir el informe completo y ajustar la operación a tu
+                    estrategia.
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <div class="demo-callout mt">
+              El botón de guardar funciona en este navegador con un inmueble
+              ficticio. No se está ejecutando una extensión ni consultando
+              anuncios reales.
+            </div>
+          </div>
+          <div class="extension-panel">
+            <header class="extension-panel-head">
+              <a class="brand" href="index.html"
+                ><span class="brand-mark"><span data-icon="house"></span></span
+                >FincaLens</a
+              ><span class="tag">DEMO</span>
+            </header>
+            <div class="extension-panel-body">
+              <img
+                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&amp;fit=crop&amp;w=600&amp;q=80"
+                alt="Vivienda ilustrativa de la demostración"
+              /><span class="eyebrow" style="font-size: 8px"
+                >EJEMPLO FICTICIO · VALENCIA</span
+              >
+              <h3>Piso en Calle del Mar</h3>
+              <p>72 m² · 2 dormitorios · 1 baño</p>
+              <div class="extension-price">185.000 €</div>
+              <div class="extension-signal">
+                <span class="muted">Precio por m²</span
+                ><strong>2.569 €/m²</strong>
+              </div>
+              <a href="informe.html" class="btn btn-primary full"
+                ><span data-icon="spark"></span>Analizar ejemplo</a
+              ><button class="btn full mt-sm" id="extension-save">
+                <span data-icon="bookmark"></span>Guardar en favoritos
+              </button>
+              <p style="font-size: 8px; text-align: center; margin-top: 15px">
+                Tus ejemplos se guardan solo en este navegador.
+              </p>
+            </div>
+          </div>
+        </section>
+        <div id="page-footer"></div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

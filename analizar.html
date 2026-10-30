@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Diseño del flujo de análisis de una oportunidad inmobiliaria con FincaLens."
+    />
+    <title>Nuevo análisis · FincaLens</title>
+    <link rel="icon" href="assets/brand.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body data-page="analyze">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div id="app-shell"></div>
+    <div class="layout-main">
+      <div id="topbar"></div>
+      <main id="main" class="content">
+        <header class="page-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 8px">
+              DEL ANUNCIO A LOS NÚMEROS
+            </div>
+            <h1>Una nueva oportunidad.</h1>
+            <p class="subtitle">
+              Empieza con un enlace o introduce los datos que ya conoces.
+            </p>
+          </div>
+          <a class="text-link" href="index.html"
+            >Volver a mi cartera <span data-icon="arrow-right"></span
+          ></a>
+        </header>
+        <div class="form-layout">
+          <section class="panel form-panel">
+            <div class="steps" aria-label="Progreso">
+              <span class="step active" data-step="1"><i>1</i>El inmueble</span
+              ><span class="step-line"></span
+              ><span class="step" data-step="2"><i>2</i>Los supuestos</span
+              ><span class="step-line"></span
+              ><span class="step" data-step="3"><i>3</i>Tu informe</span>
+            </div>
+            <form id="analysis-form">
+              <div id="analysis-step-1">
+                <h2>¿Qué inmueble tienes en mente?</h2>
+                <p class="muted">Elige cómo quieres empezar tu análisis.</p>
+                <div
+                  class="source-choice"
+                  role="group"
+                  aria-label="Origen de datos"
+                >
+                  <button
+                    type="button"
+                    class="source-card active"
+                    data-source="link"
+                    aria-pressed="true"
+                  >
+                    <span data-icon="link"></span
+                    ><strong>Enlace de Idealista</strong
+                    ><small>Diseño del flujo de importación</small></button
+                  ><button
+                    type="button"
+                    class="source-card"
+                    data-source="manual"
+                    aria-pressed="false"
+                  >
+                    <span data-icon="edit"></span
+                    ><strong>Introducir los datos</strong
+                    ><small>También para inmuebles fuera del portal</small>
+                  </button>
+                </div>
+                <div id="url-source">
+                  <div class="form-field">
+                    <label for="listing-url">Enlace del anuncio</label>
+                    <div class="url-field">
+                      <span data-icon="link"></span
+                      ><input
+                        type="url"
+                        id="listing-url"
+                        placeholder="https://www.idealista.com/inmueble/…/"
+                      />
+                    </div>
+                  </div>
+                  <div class="demo-callout mt-sm">
+                    <strong>Estás en un prototipo de diseño.</strong> No se
+                    consulta Idealista. Puedes usar un ejemplo ficticio o
+                    introducir los datos manualmente.
+                  </div>
+                  <button
+                    class="text-link btn-quiet mt-sm"
+                    type="button"
+                    id="load-example"
+                  >
+                    Cargar un ejemplo ficticio
+                    <span data-icon="arrow-right"></span>
+                  </button>
+                </div>
+                <div class="form-field">
+                  <label for="listing-name">Nombre del inmueble</label
+                  ><input
+                    id="listing-name"
+                    name="name"
+                    placeholder="P. ej. Piso en Calle del Mar"
+                    required
+                    maxlength="100"
+                  />
+                </div>
+                <div class="form-field">
+                  <label for="listing-city">Zona o ciudad</label
+                  ><input
+                    id="listing-city"
+                    name="location"
+                    placeholder="P. ej. El Cabanyal, Valencia"
+                    required
+                    maxlength="100"
+                  />
+                </div>
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="listing-price">Precio de compra (€)</label
+                    ><input
+                      id="listing-price"
+                      name="price"
+                      type="number"
+                      min="1000"
+                      max="10000000"
+                      step="1"
+                      placeholder="185000"
+                      required
+                    />
+                  </div>
+                  <div class="form-field">
+                    <label for="listing-area">Superficie construida (m²)</label
+                    ><input
+                      id="listing-area"
+                      name="area"
+                      type="number"
+                      min="1"
+                      max="10000"
+                      step="0.1"
+                      placeholder="72"
+                      required
+                    />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <span class="muted" style="font-size: 10px"
+                    >Tus datos se quedan en este navegador.</span
+                  ><button class="btn btn-primary" type="button" id="next-step">
+                    Continuar <span data-icon="arrow-right"></span>
+                  </button>
+                </div>
+              </div>
+              <div id="analysis-step-2" hidden>
+                <h2>Define el punto de partida.</h2>
+                <p class="muted">
+                  Podrás cambiar estos valores en el simulador del informe.
+                </p>
+                <div class="form-field">
+                  <label for="listing-rent">Alquiler mensual estimado (€)</label
+                  ><input
+                    id="listing-rent"
+                    type="number"
+                    name="rent"
+                    min="0"
+                    max="20000"
+                    step="1"
+                    placeholder="1100"
+                    required
+                  /><small
+                    >Valor aportado por ti. No se verificará con datos de
+                    mercado.</small
+                  >
+                </div>
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="listing-finance">Financiación (%)</label
+                    ><input
+                      id="listing-finance"
+                      type="number"
+                      min="0"
+                      max="90"
+                      name="finance"
+                      value="80"
+                      required
+                    />
+                  </div>
+                  <div class="form-field">
+                    <label for="listing-interest">Interés anual (%)</label
+                    ><input
+                      id="listing-interest"
+                      type="number"
+                      min="0"
+                      max="15"
+                      step="0.1"
+                      name="interest"
+                      value="3.2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label for="listing-renovation">Reforma prevista (€)</label
+                  ><input
+                    id="listing-renovation"
+                    name="renovation"
+                    type="number"
+                    min="0"
+                    max="500000"
+                    step="1"
+                    value="0"
+                    required
+                  />
+                </div>
+                <div class="assumption-note">
+                  <span data-icon="info"></span
+                  ><span
+                    >Plazo de 30 años, gastos operativos del 15 % e impuesto de
+                    compra ilustrativo del 6 %. El prototipo no revisa
+                    restricciones jurídicas ni financiación real.</span
+                  >
+                </div>
+                <div class="form-actions">
+                  <button
+                    class="btn btn-quiet"
+                    type="button"
+                    id="previous-step"
+                  >
+                    <span data-icon="arrow-left"></span>Anterior</button
+                  ><button class="btn btn-primary" type="submit">
+                    Preparar informe local <span data-icon="arrow-right"></span>
+                  </button>
+                </div>
+              </div>
+            </form>
+            <div id="analysis-step-3" class="completion" hidden>
+              <div class="completion-mark"><span data-icon="check"></span></div>
+              <span class="eyebrow">TODO LISTO PARA EXPLORAR</span>
+              <h2 class="mt-sm">Tu escenario está preparado.</h2>
+              <p>
+                El informe utiliza los datos que has introducido. Ajusta los
+                supuestos y compara los resultados a tu ritmo.
+              </p>
+              <a class="btn btn-primary" href="informe.html?custom=1"
+                >Abrir mi informe <span data-icon="arrow-right"></span></a
+              ><button
+                class="btn btn-quiet mt-sm"
+                type="button"
+                id="new-analysis-again"
+              >
+                Preparar otro análisis
+              </button>
+            </div>
+          </section>
+          <aside class="stack">
+            <section class="panel">
+              <span class="source-pill"
+                ><span data-icon="spark"></span>MENOS RUIDO, MÁS CONTEXTO</span
+              >
+              <h2 class="mt-sm">
+                De la intuición<br />a una decisión informada.
+              </h2>
+              <ol class="info-steps">
+                <li>
+                  <i>1</i>
+                  <div>
+                    <strong>El punto de partida</strong>
+                    <p>Precio, superficie y condiciones del inmueble.</p>
+                  </div>
+                </li>
+                <li>
+                  <i>2</i>
+                  <div>
+                    <strong>Los números completos</strong>
+                    <p>Entrada, gastos, hipoteca y margen mensual.</p>
+                  </div>
+                </li>
+                <li>
+                  <i>3</i>
+                  <div>
+                    <strong>Tu siguiente paso</strong>
+                    <p>
+                      Simula alternativas y prepara las preguntas de la visita.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </section>
+            <section class="panel tip-panel">
+              <span class="eyebrow">DESDE EL PROPIO ANUNCIO</span>
+              <h2>Una mirada<br />con FincaLens.</h2>
+              <p>
+                Explora cómo será el panel de la extensión dentro de Idealista.
+              </p>
+              <a class="text-link" href="extension.html"
+                >Ver la extensión <span data-icon="arrow-right"></span
+              ></a>
+            </section>
+          </aside>
+        </div>
+        <div id="page-footer"></div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>
