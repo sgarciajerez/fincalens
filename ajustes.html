@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Personaliza tus supuestos y preferencias en el prototipo de FincaLens."
+    />
+    <title>Preferencias · FincaLens</title>
+    <link rel="icon" href="assets/brand.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body data-page="settings">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div id="app-shell"></div>
+    <div class="layout-main">
+      <div id="topbar"></div>
+      <main id="main" class="content">
+        <header class="page-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 8px">A TU MANERA</div>
+            <h1>Tu criterio, tus preferencias.</h1>
+            <p class="subtitle">
+              Configura el punto de partida de tus próximos análisis locales.
+            </p>
+          </div>
+          <span class="tag">Guardado en este navegador</span>
+        </header>
+        <div class="settings-layout">
+          <form class="panel form-panel" id="settings-form">
+            <section class="settings-group">
+              <h3>Tu espacio de trabajo</h3>
+              <p>Personaliza cómo aparece tu cartera en este prototipo.</p>
+              <div class="form-field">
+                <label for="workspace-name">Nombre del espacio</label
+                ><input
+                  id="workspace-name"
+                  name="workspace"
+                  value="Mi espacio personal"
+                  required
+                  maxlength="40"
+                />
+              </div>
+            </section>
+            <section class="settings-group">
+              <h3>Supuestos iniciales</h3>
+              <p>
+                Se aplican al empezar un nuevo análisis; no modifican informes
+                anteriores.
+              </p>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="default-finance">Financiación (%)</label
+                  ><input
+                    id="default-finance"
+                    name="finance"
+                    type="number"
+                    min="0"
+                    max="90"
+                    value="80"
+                    required
+                  />
+                </div>
+                <div class="form-field">
+                  <label for="default-interest">Interés anual (%)</label
+                  ><input
+                    id="default-interest"
+                    name="interest"
+                    type="number"
+                    min="0"
+                    max="15"
+                    step="0.1"
+                    value="3.2"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="assumption-note">
+                <span data-icon="info"></span
+                ><span
+                  >El prototipo mantiene un plazo de 30 años y gastos operativos
+                  del 15 %. Las hipótesis fiscales son ilustrativas.</span
+                >
+              </div>
+            </section>
+            <section class="settings-group">
+              <h3>Experiencia de lectura</h3>
+              <p>Una interfaz que se adapta a cómo prefieres trabajar.</p>
+              <label class="toggle-row"
+                ><span
+                  ><strong>Reducir las animaciones</strong
+                  ><small>Una experiencia visual más tranquila.</small></span
+                ><input
+                  class="switch"
+                  type="checkbox"
+                  name="reducedMotion"
+                  aria-label="Reducir las animaciones"
+              /></label>
+            </section>
+            <div class="form-actions">
+              <span class="muted" style="font-size: 10px"
+                >Sin cuenta ni sincronización en esta demo.</span
+              ><button type="submit" class="btn btn-primary">
+                <span data-icon="check"></span>Guardar preferencias
+              </button>
+            </div>
+          </form>
+          <aside class="stack">
+            <section class="panel tip-panel">
+              <span class="eyebrow">TU ESPACIO FINCALENS</span>
+              <h2>Explora sin<br />perder perspectiva.</h2>
+              <p>
+                Este prototipo es gratuito. Los planes comerciales se definirán
+                cuando exista el servicio de análisis.
+              </p>
+              <ul class="plan-list">
+                <li>Cartera de ejemplo</li>
+                <li>Simulador interactivo</li>
+                <li>Comparador de inmuebles</li>
+                <li>Exportación y checklist local</li>
+              </ul>
+              <a class="text-link" href="index.html"
+                >Volver a mi cartera <span data-icon="arrow-right"></span
+              ></a>
+            </section>
+            <section class="panel">
+              <h3 style="font-size: 13px">Tus datos, a la vista.</h3>
+              <p class="muted mt-sm" style="font-size: 10px; line-height: 1.9">
+                Favoritos, escenarios y preferencias se guardan en el navegador.
+                Este prototipo no envía tus datos a un servidor de FincaLens.
+                Las fuentes e imágenes se solicitan a proveedores externos.
+              </p>
+            </section>
+          </aside>
+        </div>
+        <div id="page-footer"></div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

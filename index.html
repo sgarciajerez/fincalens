@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Explora, compara y entiende tus próximas oportunidades inmobiliarias con FincaLens."
+    />
+    <title>Mi cartera · FincaLens</title>
+    <link rel="icon" href="assets/brand.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script type="module" src="assets/app.js"></script>
+  </head>
+  <body data-page="portfolio">
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div id="app-shell"></div>
+    <div class="layout-main">
+      <div id="topbar"></div>
+      <main id="main" class="content">
+        <header class="page-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 8px">
+              TU PRÓXIMA INVERSIÓN EMPIEZA AQUÍ
+            </div>
+            <h1 id="portfolio-title">Mi cartera</h1>
+            <p class="subtitle">
+              Una perspectiva clara de tus oportunidades inmobiliarias.
+            </p>
+          </div>
+          <div class="head-actions">
+            <button class="btn" id="export-portfolio">
+              <span data-icon="download"></span
+              ><span class="export-label">Exportar</span></button
+            ><a class="btn btn-primary" href="analizar.html"
+              ><span data-icon="plus"></span>Analizar inmueble</a
+            >
+          </div>
+        </header>
+        <section class="stats-grid" aria-label="Resumen de cartera">
+          <article class="stat">
+            <div class="stat-label">
+              Inmuebles analizados<span data-icon="layers"></span>
+            </div>
+            <div class="stat-value mono" id="stat-count">6</div>
+            <p class="stat-bottom">Cartera de demostración</p>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Rentabilidad neta media<span data-icon="trending"></span>
+            </div>
+            <div class="stat-value mono">
+              4,8<span style="font-size: 19px"> %</span>
+            </div>
+            <p class="stat-bottom">
+              Antes de financiación e impuestos personales
+            </p>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Oportunidades destacadas<span data-icon="spark"></span>
+            </div>
+            <div class="stat-value mono">2</div>
+            <p class="stat-bottom"><b>70+</b> Puntuación orientativa</p>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Bajadas de precio<span data-icon="trend-down"></span>
+            </div>
+            <div class="stat-value mono">3</div>
+            <p class="stat-bottom">
+              <b class="orange">Ejemplo</b> Cambios en anuncios guardados
+            </p>
+          </article>
+        </section>
+        <div class="insight-banner">
+          <div class="insight-icon"><span data-icon="spark"></span></div>
+          <p>
+            <strong>Hay oportunidades que merecen otra mirada.</strong><br />Dos
+            inmuebles de tu cartera destacan por sus números y su potencial.
+          </p>
+          <button class="text-link btn-quiet" id="show-opportunities">
+            Ver oportunidades <span data-icon="arrow-right"></span>
+          </button>
+        </div>
+        <section aria-labelledby="portfolio-section">
+          <div class="section-heading">
+            <h2 id="portfolio-section">
+              Tus inmuebles <span class="count" id="property-count">6</span>
+            </h2>
+            <span class="eyebrow" style="font-size: 8px"
+              >DATOS ILUSTRATIVOS · OCTUBRE 2026</span
+            >
+          </div>
+          <div class="toolbar">
+            <div class="tabs" role="group" aria-label="Filtrar inmuebles">
+              <button class="tab active" data-filter="all" aria-pressed="true">
+                Todos <span>6</span></button
+              ><button
+                class="tab"
+                data-filter="opportunity"
+                aria-pressed="false"
+              >
+                Oportunidades <span>2</span></button
+              ><button class="tab" data-filter="review" aria-pressed="false">
+                A revisar <span>3</span></button
+              ><button class="tab" data-filter="favorite" aria-pressed="false">
+                Favoritos
+              </button>
+            </div>
+            <div class="toolbar-tools">
+              <label class="search"
+                ><span data-icon="search"></span
+                ><span class="sr-only">Buscar inmueble o zona</span
+                ><input
+                  id="property-search"
+                  placeholder="Buscar inmueble o zona…"
+                  type="search" /></label
+              ><label class="sr-only" for="property-sort"
+                >Ordenar inmuebles</label
+              ><select id="property-sort" class="btn btn-sm">
+                <option value="recent">Más recientes</option>
+                <option value="score">Mejor puntuación</option>
+                <option value="price">Menor precio</option>
+              </select>
+              <div class="view-switch" role="group" aria-label="Vista">
+                <button
+                  class="active"
+                  id="grid-view"
+                  aria-label="Vista de tarjetas"
+                  aria-pressed="true"
+                >
+                  <span data-icon="grid"></span></button
+                ><button
+                  id="list-view"
+                  aria-label="Vista de lista"
+                  aria-pressed="false"
+                >
+                  <span data-icon="list"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            class="property-grid"
+            id="property-grid"
+            aria-live="polite"
+          ></div>
+        </section>
+        <div class="bottom-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Últimos movimientos</h2>
+              <span class="eyebrow">EJEMPLOS DE ACTIVIDAD</span>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon">
+                <span data-icon="trend-down"></span>
+              </div>
+              <div>
+                <p><strong>Calle de Olavide</strong> ha bajado de precio</p>
+                <small
+                  >−15.000 € · Un nuevo punto de partida para negociar</small
+                >
+              </div>
+              <small>Hace 2 h</small>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon"><span data-icon="file"></span></div>
+              <div>
+                <p>Informe disponible de <strong>Calle del Mar</strong></p>
+                <small>76/100 · Buenos números con los supuestos base</small>
+              </div>
+              <small>Ayer</small>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon">
+                <span data-icon="bookmark"></span>
+              </div>
+              <div>
+                <p>Has añadido <strong>Plaza de los Naranjos</strong></p>
+                <small>Tu cartera, organizada en un solo lugar</small>
+              </div>
+              <small>Ayer</small>
+            </div>
+          </section>
+          <aside class="panel tip-panel">
+            <span class="eyebrow">UNA MEJOR FORMA DE MIRAR</span>
+            <h2>El precio es solo<br />el principio.</h2>
+            <p>
+              Compara el capital que necesitas, los gastos y lo que queda cada
+              mes antes de decidir.
+            </p>
+            <a class="text-link" href="comparar.html"
+              >Comparar mis inmuebles <span data-icon="arrow-right"></span
+            ></a>
+          </aside>
+        </div>
+        <div id="page-footer"></div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

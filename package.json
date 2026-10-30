@@ -8,5 +8,10 @@
     "start": "node scripts/serve.mjs",
     "check": "node --check scripts/serve.mjs && node --check assets/app.js && node scripts/check-pages.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
 }
