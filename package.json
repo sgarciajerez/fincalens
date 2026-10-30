@@ -1,0 +1,12 @@
+{
+  "name": "fincalens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive HTML design prototype for property investment analysis",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "check": "node --check scripts/serve.mjs && node --check assets/app.js && node scripts/check-pages.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
