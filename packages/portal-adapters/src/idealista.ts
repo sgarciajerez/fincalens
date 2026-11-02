@@ -97,6 +97,24 @@ export function normalizeIdealista(
     area: number(find(/m² construidos/i)),
     bedrooms: number(find(/habitaciones|\bhab\./i)),
     bathrooms: number(find(/baños?/i)),
+    floor:
+      find(/planta/i).match(
+        /(?:planta\s*)?([\wªº.-]+)(?:\s+exterior)?/i,
+      )?.[1] || null,
+    hasLift: features.some((feature) => /\bascensor\b/i.test(feature))
+      ? !features.some((feature) =>
+          /sin ascensor|no dispone de ascensor/i.test(feature),
+        )
+      : null,
+    energyRating:
+      find(/certificado energético/i).match(
+        /(?:consumo|emisiones)?\s*([A-G])\b/i,
+      )?.[1] || null,
+    buildingYear: number(find(/año de construcción/i)),
+    areaUsable: number(find(/m² útiles/i)),
+    condition: /a reformar|para reformar/i.test(features.join(" "))
+      ? "to-renovate"
+      : "unknown",
     description: raw.description.slice(0, 30000),
     features,
     source: "listing",

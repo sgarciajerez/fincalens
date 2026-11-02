@@ -47,6 +47,20 @@ export const snapshotSchema = z.object({
   area: z.number().finite().positive().max(100_000).nullable().default(null),
   bedrooms: z.number().int().min(0).max(100).nullable().default(null),
   bathrooms: z.number().int().min(0).max(100).nullable().default(null),
+  floor: z.string().trim().max(40).nullable().default(null),
+  hasLift: z.boolean().nullable().default(null),
+  energyRating: z.string().trim().max(8).nullable().default(null),
+  condition: z
+    .enum(["new", "good", "to-renovate", "unknown"])
+    .default("unknown"),
+  buildingYear: z.number().int().min(1500).max(2100).nullable().default(null),
+  areaUsable: z
+    .number()
+    .finite()
+    .positive()
+    .max(100_000)
+    .nullable()
+    .default(null),
   description: z.string().max(30000).default(""),
   features: z.array(z.string().max(500)).max(80).default([]),
   source: z.enum(["listing", "user", "example"]),

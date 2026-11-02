@@ -77,6 +77,38 @@ export class ReportPage extends FincaPage {
       this.marketReferences = marketReferences;
       this.saleReferences = saleReferences;
       this.selectedMarketReference = "";
+      if (
+        this.report &&
+        this.scenario?.rent === null &&
+        this.report.snapshot.area &&
+        !this.report.risks.some((risk) => risk.needsContractRent)
+      ) {
+        const rentReference = marketReferences
+          .filter((item) =>
+            this.matchesGeography(
+              item.geography,
+              this.report!.snapshot.location,
+            ),
+          )
+          .sort(
+            (a, b) =>
+              ["neighborhood", "district", "municipality", "province"].indexOf(
+                a.level,
+              ) -
+              ["neighborhood", "district", "municipality", "province"].indexOf(
+                b.level,
+              ),
+          )[0];
+        if (rentReference) {
+          this.scenario = {
+            ...this.scenario,
+            rent: Math.round(
+              this.report.snapshot.area * rentReference.rentPerM2,
+            ),
+          };
+          this.selectedMarketReference = rentReference.id;
+        }
+      }
       this.shareUrl = "";
       this.error = "";
     } catch (e) {
@@ -149,6 +181,18 @@ export class ReportPage extends FincaPage {
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
+  }
+  private geographyNames(value: string) {
+    return new Set(
+      value
+        .split(/[·,]/)
+        .map((part) => this.normalizeGeography(part))
+        .filter(Boolean),
+    );
+  }
+  private matchesGeography(reference: string, listing: string) {
+    const names = this.geographyNames(listing);
+    return names.has(this.normalizeGeography(reference));
   }
   private async checklist(id: string, checked: boolean) {
     if (!this.report) return;
@@ -613,8 +657,8 @@ export class ReportPage extends FincaPage {
             ${(() => {
               const key = this.normalizeGeography(r.snapshot.location);
               const reference = this.saleReferences
-                .filter(
-                  (item) => key === this.normalizeGeography(item.geography),
+                .filter((item) =>
+                  this.matchesGeography(item.geography, r.snapshot.location),
                 )
                 .sort(
                   (a, b) =>
@@ -744,20 +788,18 @@ export class ReportPage extends FincaPage {
                         Esta ficha requiere comprobar primero el alquiler
                         contractual o las restricciones aplicables.
                       </p>`
-                    : this.marketReferences.filter(
-                          (reference) =>
-                            this.normalizeGeography(reference.geography) ===
-                            this.normalizeGeography(
-                              this.report!.snapshot.location,
-                            ),
+                    : this.marketReferences.filter((reference) =>
+                          this.matchesGeography(
+                            reference.geography,
+                            this.report!.snapshot.location,
+                          ),
                         ).length
                       ? this.marketReferences
-                          .filter(
-                            (reference) =>
-                              this.normalizeGeography(reference.geography) ===
-                              this.normalizeGeography(
-                                this.report!.snapshot.location,
-                              ),
+                          .filter((reference) =>
+                            this.matchesGeography(
+                              reference.geography,
+                              this.report!.snapshot.location,
+                            ),
                           )
                           .map(
                             (reference) =>

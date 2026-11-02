@@ -100,6 +100,8 @@ const geographyKey = (value: string) =>
     .toLocaleLowerCase("es")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+const geographyMatches = (reference: string, location: string) =>
+  location.split(/[·,]/).map(geographyKey).includes(geographyKey(reference));
 const marketReferenceView = (row: Row): MarketReferenceSnapshot => ({
   id: String(row.id),
   geography: String(row.geography),
@@ -777,8 +779,7 @@ export async function createApi(
         const candidate = marketReferenceView(rows[0]);
         if (
           !base.snapshot.area ||
-          geographyKey(candidate.geography) !==
-            geographyKey(base.snapshot.location)
+          !geographyMatches(candidate.geography, base.snapshot.location)
         )
           throw new HttpError(
             422,

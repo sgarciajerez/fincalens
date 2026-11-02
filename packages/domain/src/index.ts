@@ -605,6 +605,46 @@ export function createReport(
       id: "rent",
       text: "Contrastar la renta y las condiciones de alquiler aplicables.",
     },
+    ...(snapshot.hasLift === false
+      ? [
+          {
+            id: "lift",
+            text: "Comprobar accesibilidad y posibles planes o derramas para instalar ascensor; el anuncio declara que no tiene.",
+          },
+        ]
+      : []),
+    ...(snapshot.energyRating
+      ? [
+          {
+            id: "energy",
+            text: `Pedir certificado energético y revisar mejoras necesarias; el anuncio indica clase ${snapshot.energyRating}.`,
+          },
+        ]
+      : []),
+    ...(snapshot.buildingYear
+      ? [
+          {
+            id: "building-year",
+            text: `Revisar ITE/IEE y actas de comunidad del edificio construido en ${snapshot.buildingYear}.`,
+          },
+        ]
+      : []),
+    ...(snapshot.hasLift === null
+      ? [
+          {
+            id: "missing-lift",
+            text: "Confirmar si el edificio dispone de ascensor; el anuncio no lo especifica.",
+          },
+        ]
+      : []),
+    ...(!snapshot.energyRating
+      ? [
+          {
+            id: "missing-energy",
+            text: "Solicitar la etiqueta y el certificado de eficiencia energética.",
+          },
+        ]
+      : []),
     ...risks.map((r) => ({
       id: `risk:${r.id}`,
       text: `Comprobar: ${r.title.toLocaleLowerCase("es")}.`,
