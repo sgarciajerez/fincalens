@@ -14,6 +14,7 @@ FincaLens es un proyecto de portfolio para explorar una aplicación de análisis
 - API Fastify, SQLite por defecto y PostgreSQL opcional.
 - Modo opcional de cuentas locales con contraseñas derivadas, sesiones aisladas por usuario y cierre de sesión. El modo local de usuario único sigue siendo el predeterminado.
 - Registro manual o CSV de referencias de alquiler, con fuente, fecha, muestra y condiciones declaradas. Se aplican a un informe de forma explícita y la revisión conserva una copia de la procedencia.
+- Comparación de precio con anuncios de la cartera y comparables aportados mediante CSV: zona exacta, tipología, área ±30 %, habitaciones próximas, recencia, filtro IQR, mediana y rango central. La señal de oportunidad exige una muestra suficiente y reciente, precio inferior al cuartil bajo, escenario conservador sin flujo negativo y ausencia de riesgos contractuales/hipotecarios.
 - Cálculo financiero TypeScript compartido y determinista. Sin rentas de mercado ni puntuaciones generadas por IA.
 
 Los cuatro inmuebles de demostración son ejemplos sintéticos, no anuncios reales.
@@ -36,6 +37,8 @@ Abre <http://127.0.0.1:4173>. La aplicación web y la API se ejecutan en tu equi
 Por defecto se usa una única cartera local (`AUTH_MODE=local`). Para habilitar varias cuentas locales, configura `AUTH_MODE=accounts` en `.env`; se solicitará registro e inicio de sesión en la aplicación. Las contraseñas requieren al menos 12 caracteres. Las cuentas no incluyen verificación de correo ni recuperación de contraseña. Para publicar detrás de HTTPS, revisa primero `COOKIE_SECURE=true`, `WEB_ORIGIN` y la sección de limitaciones.
 
 La página **Referencias de alquiler** admite datos añadidos manualmente o pegados como CSV. La importación requiere que confirmes que tienes derecho a procesar los datos y guardar las condiciones de uso declaradas. No se descargan automáticamente comparables ni se extraen datos de Idealista para alimentar esas referencias. En un informe, la aplicación muestra solo la coincidencia exacta de zona; al elegir **Usar en escenario**, calcula superficie × €/m² y guarda esa referencia en una nueva revisión.
+
+En esa misma página puedes importar anuncios comparables de venta con el CSV de plantilla. El análisis de un informe incorpora anuncios guardados en tu propia cartera e importados para la cuenta, y crea una revisión inmutable con los comparables y su procedencia. Usa precios anunciados, no precios de cierre. El rango no ajusta todavía estado, planta, ascensor, eficiencia energética ni reforma. Una señal “Posible oportunidad · verificar” es solo un filtro inicial, no una tasación.
 
 ## Extensión Chrome
 
@@ -78,6 +81,7 @@ tests/                 Cobertura del dominio y los flujos HTTP
 
 - El extractor depende de la estructura pública visible de Idealista y puede necesitar adaptación cuando cambie el sitio.
 - No hay proveedor de alquileres comparables, valoración automática, OCR ni análisis mediante IA. Las referencias de alquiler las aporta el usuario y su licencia o exactitud no se verifica automáticamente.
+- No hay conexión automática a Idealista ni proveedor de precios comparables: esos datos deben aportarse mediante la cartera o un CSV con derechos de uso. No se verifica automáticamente su licencia, exactitud ni equivalencia de estado.
 - Los impuestos se representan como porcentaje supuesto; no se calcula el impuesto autonómico aplicable a cada operación.
 - Las cuentas integradas son para ejecución local: faltan verificación de correo, recuperación segura de contraseña, administración de sesiones y protección operativa para un servicio público. El modo de enlace compartido es público por URL hasta su caducidad o revocación.
 - La configuración de PostgreSQL es opcional; el desarrollo por defecto no requiere Docker.

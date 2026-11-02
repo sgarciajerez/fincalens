@@ -67,6 +67,42 @@ export class SharedPage extends FincaPage {
           </div>
         </div>
       </section>
+      ${r.marketAnalysis
+        ? html`<section class="panel report-section">
+            <div class="eyebrow">
+              COMPARABLES DE ANUNCIOS · CONFIANZA
+              ${r.marketAnalysis.confidence === "medium" ? "MEDIA" : "BAJA"}
+            </div>
+            <h2 style="margin-top:8px">
+              ${r.marketAnalysis.verdict === "potential"
+                ? "Posible oportunidad · verificar"
+                : r.marketAnalysis.verdict === "above-range"
+                  ? "Por encima del rango"
+                  : r.marketAnalysis.verdict === "within-range"
+                    ? "Dentro del rango"
+                    : r.marketAnalysis.verdict === "review"
+                      ? "Revisión necesaria"
+                      : "Faltan comparables"}
+            </h2>
+            <p class="form-note">${r.marketAnalysis.explanation}</p>
+            <p style="margin-top:10px">
+              Rango central: ${euro(r.marketAnalysis.rangeLow)} –
+              ${euro(r.marketAnalysis.rangeHigh)} · Mediana:
+              ${euro(r.marketAnalysis.estimatedPrice)} · Muestra:
+              ${r.marketAnalysis.sampleSize}
+            </p>
+            <p class="form-note">
+              Flujo actual ${euro(r.marketAnalysis.currentCashFlow)} · flujo
+              conservador ${euro(r.marketAnalysis.conservativeCashFlow)}
+            </p>
+            ${r.marketAnalysis.warnings.map(
+              (warning) =>
+                html`<p class="banner-note" style="margin-top:8px">
+                  ${warning}
+                </p>`,
+            )}
+          </section>`
+        : ""}
       <section class="panel report-section">
         <h2>Supuestos y limitaciones</h2>
         <p class="form-note" style="margin-top:10px">

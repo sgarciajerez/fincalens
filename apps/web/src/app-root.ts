@@ -224,7 +224,7 @@ export class AppRoot extends LitElement {
             data-nav
             href="#!/mercado"
             class=${this.current === "market" ? "active" : ""}
-            >⌖ <span>Referencias de alquiler</span></a
+            >⌖ <span>Datos de mercado</span></a
           >
         </nav>
         <div class="nav-label" style="margin-top:24px">HERRAMIENTAS</div>
