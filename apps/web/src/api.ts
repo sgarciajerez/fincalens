@@ -1,9 +1,12 @@
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    credentials: "same-origin",
-    ...init,
-    headers: { "content-type": "application/json", ...init.headers },
-  });
+  const response = await fetch(
+    `${import.meta.env.VITE_API_BASE || ""}${path}`,
+    {
+      credentials: "include",
+      ...init,
+      headers: { "content-type": "application/json", ...init.headers },
+    },
+  );
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || `Error ${response.status}`);
   return body as T;

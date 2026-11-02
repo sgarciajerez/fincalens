@@ -154,7 +154,11 @@ export async function createApi(
   const authMode = options.authMode || "local";
   const secureCookies = options.secureCookies ?? false;
   const dummyPasswordHash = await hashPassword(token());
-  const app = Fastify({ logger: false, bodyLimit: 100_000, trustProxy: false });
+  const app = Fastify({
+    logger: process.env.NODE_ENV === "production",
+    bodyLimit: 100_000,
+    trustProxy: process.env.TRUST_PROXY === "true",
+  });
   await app.register(cookie);
   await app.register(cors, {
     origin: (origin, callback) =>
@@ -165,6 +169,15 @@ export async function createApi(
           /^chrome-extension:\/\/[a-p]{32}$/.test(origin),
       ),
     credentials: true,
+  });
+  app.get("/healthz", async (_req, reply) => {
+    try {
+      await db.all("SELECT 1 AS ok");
+      return { status: "ok" };
+    } catch {
+      reply.code(503);
+      return { status: "unavailable" };
+    }
   });
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof z.ZodError) {

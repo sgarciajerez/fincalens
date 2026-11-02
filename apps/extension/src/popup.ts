@@ -6,7 +6,8 @@ import {
 } from "../../../packages/portal-adapters/src/idealista.js";
 import type { AnalysisJob, PropertySummary } from "@fincalens/contracts";
 
-const API = "http://127.0.0.1:4174/v1";
+declare const __FINCALENS_API_BASE__: string;
+const API = `${__FINCALENS_API_BASE__}/v1`;
 const connection = document.querySelector<HTMLElement>("#connection")!;
 const capture = document.querySelector<HTMLElement>("#capture")!;
 const message = document.querySelector<HTMLElement>("#message")!;
