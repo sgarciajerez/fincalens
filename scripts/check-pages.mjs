@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
-import { calculate, mortgagePayment } from "../assets/finance.js";
+import { calculate, mortgagePayment } from "../design/assets/finance.js";
 
 const pages = [
   "index",
@@ -12,7 +12,7 @@ const pages = [
 ];
 for (const page of pages) {
   const html = await readFile(
-    new URL(`../${page}.html`, import.meta.url),
+    new URL(`../design/${page}.html`, import.meta.url),
     "utf8",
   );
   assert.match(html, /<html lang="es">/);

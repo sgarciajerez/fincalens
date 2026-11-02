@@ -1,17 +1,46 @@
 {
   "name": "fincalens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Interactive HTML design prototype for property investment analysis",
+  "description": "Property analysis application with Lit, Open Cells and a Chrome extension",
   "type": "module",
   "scripts": {
-    "start": "node scripts/serve.mjs",
-    "check": "node --check scripts/serve.mjs && node --check assets/app.js && node scripts/check-pages.mjs"
+    "start": "node --import tsx scripts/dev.ts",
+    "dev": "node --import tsx scripts/dev.ts",
+    "serve:prototype": "node scripts/serve-prototype.mjs",
+    "build": "vite build && node --import tsx scripts/build-extension.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:prototype": "node scripts/check-pages.mjs",
+    "check": "npm run typecheck && npm test",
+    "format": "prettier --write apps packages tests scripts *.json *.ts"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "devDependencies": {
-    "prettier": "3.6.2"
-  }
+    "@types/chrome": "0.1.37",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "esbuild": "0.25.12",
+    "prettier": "3.6.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "@fastify/cors": "11.3.1",
+    "@open-cells/core": "1.2.1",
+    "@open-cells/element-controller": "1.0.6",
+    "@open-cells/page-controller": "1.0.6",
+    "fastify": "5.12.7",
+    "lit": "3.3.3",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

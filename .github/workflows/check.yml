@@ -1,4 +1,4 @@
-name: Prototype checks
+name: Application checks
 
 on:
   push:
@@ -16,8 +16,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npx prettier --check '*.html' 'assets/*.css' 'assets/*.js' 'scripts/*.mjs' package.json
+      - run: npm run build
+      - run: npx prettier --check 'apps/**/*.{ts,css,html,json}' 'packages/**/*.{ts,json}' 'scripts/*.ts' 'tests/*.ts' '*.json' 'vite.config.ts' 'vitest.config.ts'

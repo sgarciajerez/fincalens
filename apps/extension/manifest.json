@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "FincaLens · analizador inmobiliario",
+  "version": "0.2.0",
+  "description": "Captura anuncios públicos de Idealista para analizarlos en FincaLens.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://www.idealista.com/inmueble/*",
+    "http://127.0.0.1:4174/*"
+  ],
+  "action": {
+    "default_title": "Analizar con FincaLens",
+    "default_popup": "popup.html"
+  },
+  "background": { "service_worker": "service-worker.js", "type": "module" }
+}

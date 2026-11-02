@@ -1,0 +1,7 @@
+{
+  "name": "@fincalens/portal-adapters",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/idealista.ts"
+}
