@@ -301,11 +301,7 @@ export function deriveMarketAnalysis(
   const nowMs = Date.parse(computedAt);
   let matched = source
     .filter((item) => {
-      if (
-        item.id === subject.propertyId ||
-        geographyKey(item.sourceLabel).length === 0
-      )
-        return false;
+      if (item.id === subject.propertyId) return false;
       if (geographyKey(item.geography) !== subjectKey) return false;
       if (
         snapshot.propertyType === "unknown" ||
@@ -330,8 +326,18 @@ export function deriveMarketAnalysis(
     .map((item) => ({ ...item, pricePerM2: item.price / item.area }));
   const unique = new Map<string, (typeof matched)[number]>();
   for (const item of matched) {
-    const signature = `${geographyKey(item.geography)}|${item.propertyType}|${Math.round(item.price)}|${Math.round(item.area)}|${item.observedAt.slice(0, 10)}`;
-    if (!unique.has(signature)) unique.set(signature, item);
+    const url = item.sourceLabel.match(/https?:\/\/\S+/i)?.[0];
+    const portalId = url?.match(/idealista\.com\/inmueble\/([^/?#]+)/i)?.[1];
+    const stableIdentity = item.listingKey || portalId;
+    const identity =
+      stableIdentity ||
+      `${geographyKey(item.sourceLabel)}|${geographyKey(item.geography)}|${item.propertyType}|${Math.round(item.area)}|${item.bedrooms ?? "?"}|${Math.round(item.price)}`;
+    const signature =
+      stableIdentity ||
+      `${geographyKey(item.sourceLabel.split("·")[0])}|${identity}`;
+    const previous = unique.get(signature);
+    if (!previous || item.observedAt > previous.observedAt)
+      unique.set(signature, item);
   }
   matched = [...unique.values()];
   const allPerM2 = matched.map((item) => item.pricePerM2).sort((a, b) => a - b);
@@ -352,27 +358,46 @@ export function deriveMarketAnalysis(
     );
   const excludedOutlierCount = beforeOutlierFilter - matched.length;
   const perM2 = matched.map((item) => item.pricePerM2).sort((a, b) => a - b);
-  const low = percentile(perM2, 0.25),
-    median = percentile(perM2, 0.5),
-    high = percentile(perM2, 0.75);
+  const enough = matched.length >= 3;
+  const low = enough ? percentile(perM2, 0.25) : null,
+    median = enough ? percentile(perM2, 0.5) : null,
+    high = enough ? percentile(perM2, 0.75) : null;
   const recentSampleSize = matched.filter(
     (item) => nowMs - Date.parse(item.observedAt) <= 90 * 86400000,
   ).length;
+  const sourceCount = new Set(
+    matched.map((item) =>
+      geographyKey(
+        item.sourceLabel.includes("·")
+          ? item.sourceLabel.split("·").at(-1)!
+          : item.sourceLabel,
+      ),
+    ),
+  ).size;
   const confidence: MarketAnalysis["confidence"] =
-    matched.length >= 5 && recentSampleSize >= Math.ceil(matched.length * 0.7)
+    matched.length >= 5 &&
+    recentSampleSize >= Math.ceil(matched.length * 0.7) &&
+    sourceCount >= 2
       ? "medium"
       : "low";
   const askingPricePerM2 = snapshot.price / snapshot.area;
+  const scenarioPrice = subject.scenario.price;
+  const scenarioPricePerM2 = scenarioPrice / snapshot.area;
   const estimatedPrice =
-    median === null ? null : Math.round(median * snapshot.area);
-  const rangeLow = low === null ? null : Math.round(low * snapshot.area);
-  const rangeHigh = high === null ? null : Math.round(high * snapshot.area);
+    !enough || median === null ? null : Math.round(median * snapshot.area);
+  const rangeLow =
+    !enough || low === null ? null : Math.round(low * snapshot.area);
+  const rangeHigh =
+    !enough || high === null ? null : Math.round(high * snapshot.area);
   const discountPercent = estimatedPrice
     ? Math.round(((estimatedPrice - snapshot.price) / estimatedPrice) * 1000) /
       10
     : null;
-  const enough = matched.length >= 3;
-  const belowRange = enough && low !== null && askingPricePerM2 < low;
+  const scenarioDiscountPercent = estimatedPrice
+    ? Math.round(((estimatedPrice - scenarioPrice) / estimatedPrice) * 1000) /
+      10
+    : null;
+  const belowRange = enough && low !== null && scenarioPricePerM2 < low;
   let conservativeCashFlow: number | null = null;
   try {
     conservativeCashFlow = calculate(
@@ -400,12 +425,12 @@ export function deriveMarketAnalysis(
     verdict === "insufficient-data"
       ? `Solo se encontraron ${matched.length} comparables recientes con la misma zona, tipología y superficie semejante; se necesitan al menos 3 para estimar un rango.`
       : verdict === "potential"
-        ? `El precio anunciado queda por debajo del cuartil inferior de ${matched.length} anuncios comparables recientes. El flujo de caja sigue siendo no negativo en el escenario conservador y no hay alertas contractuales o hipotecarias detectadas; verifica el inmueble y los datos antes de decidir.`
+        ? `El precio del escenario (${Math.round(scenarioPrice).toLocaleString("es-ES")} €) queda por debajo del cuartil inferior de ${matched.length} anuncios comparables. El flujo de caja sigue siendo no negativo en el escenario conservador; verifica el inmueble, las fuentes y los datos antes de decidir.`
         : verdict === "review" && belowRange
-          ? `El precio anunciado queda por debajo del rango central, pero la muestra, su actualidad, los supuestos financieros o las alertas no permiten marcarlo como oportunidad con confianza.`
+          ? `El precio del escenario queda por debajo del rango central, pero la muestra, su actualidad, los supuestos financieros o las alertas no permiten marcarlo como oportunidad con confianza.`
           : verdict === "above-range"
-            ? `El precio anunciado supera el cuartil superior del rango estimado con ${matched.length} anuncios comparables.`
-            : `El precio anunciado queda dentro del rango central estimado con ${matched.length} anuncios comparables.`;
+            ? `El precio del escenario supera el cuartil superior del rango observado en ${matched.length} anuncios comparables.`
+            : `El precio del escenario queda dentro del rango central observado en ${matched.length} anuncios comparables.`;
   return {
     computedAt,
     geography: snapshot.location,
@@ -413,6 +438,8 @@ export function deriveMarketAnalysis(
     subjectArea: snapshot.area,
     subjectPrice: snapshot.price,
     askingPricePerM2: Math.round(askingPricePerM2),
+    scenarioPrice,
+    scenarioPricePerM2: Math.round(scenarioPricePerM2),
     currentCashFlow: subject.result.cashFlow,
     conservativeCashFlow,
     estimatedPrice,
@@ -422,7 +449,9 @@ export function deriveMarketAnalysis(
     medianPricePerM2: median === null ? null : Math.round(median),
     highPricePerM2: high === null ? null : Math.round(high),
     discountPercent,
+    scenarioDiscountPercent,
     sampleSize: matched.length,
+    sourceCount,
     excludedOutlierCount,
     recentSampleSize,
     confidence,
@@ -436,7 +465,14 @@ export function deriveMarketAnalysis(
       "No se ajusta todavía por estado, planta, ascensor, eficiencia energética ni reforma; verifica que los inmuebles sean realmente equivalentes.",
       "El resultado es un filtro orientativo, no una tasación ni asesoramiento de inversión.",
       ...(confidence === "low"
-        ? ["La muestra es pequeña o contiene datos con más de 90 días."]
+        ? [
+            "Confianza baja: muestra pequeña, datos antiguos o una sola fuente independiente.",
+          ]
+        : []),
+      ...(matched.length < 3
+        ? [
+            "Hay menos de 3 anuncios; se muestran observaciones sin estimar mediana ni rango.",
+          ]
         : []),
     ],
   };

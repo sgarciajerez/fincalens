@@ -7,7 +7,7 @@ import type {
   Scenario,
 } from "@fincalens/contracts";
 import type { PropertySummary } from "@fincalens/contracts";
-import { preset } from "@fincalens/domain";
+import { calculate, preset } from "@fincalens/domain";
 import "../components/scenario-editor.js";
 
 export class ReportPage extends FincaPage {
@@ -113,7 +113,10 @@ export class ReportPage extends FincaPage {
     try {
       const revision = await api<ReportRevision>(
         `/v1/reports/${this.report.id}/market-analysis`,
-        { method: "POST", body: "{}" },
+        {
+          method: "POST",
+          body: JSON.stringify(this.scenario ?? this.report.scenario),
+        },
       );
       location.hash = `#!/informe/${revision.id}`;
     } catch (error) {
@@ -195,7 +198,17 @@ export class ReportPage extends FincaPage {
     if (!this.report)
       return html`<div class="loading" role="status">Cargando informe…</div>`;
     const r = this.report;
-    const status = r.result.decision;
+    const scenario = this.scenario ?? r.scenario;
+    const scenarioDirty =
+      JSON.stringify(scenario) !== JSON.stringify(r.scenario);
+    let preview = r.result;
+    let previewValid = true;
+    try {
+      preview = calculate(scenario, r.snapshot, r.risks);
+    } catch {
+      previewValid = false;
+    }
+    const status = previewValid ? preview.decision : "restricted";
     const statusLabel =
       status === "restricted"
         ? "Requiere comprobación"
@@ -268,8 +281,14 @@ export class ReportPage extends FincaPage {
                 <div class="eyebrow">
                   LECTURA DEL ESCENARIO · NO ES ASESORAMIENTO
                 </div>
-                <h2>${statusLabel}</h2>
-                <p>${r.summary}</p>
+                <h2>${statusLabel}${scenarioDirty ? " · vista previa" : ""}</h2>
+                <p>
+                  ${!previewValid
+                    ? "Este escenario no se puede calcular con los datos actuales. Revisa los campos o las restricciones de financiación."
+                    : scenarioDirty
+                      ? "Lectura calculada con los supuestos editados. Guarda el escenario para crear una revisión permanente."
+                      : r.summary}
+                </p>
               </div>
               <div class="score-ring">
                 <svg viewBox="0 0 100 100">
@@ -284,7 +303,7 @@ export class ReportPage extends FincaPage {
                 </svg>
                 <div class="score-center">
                   <strong>${r.result.score ?? "—"}</strong
-                  ><small>orientativo</small>
+                  ><small>score base</small>
                 </div>
               </div>
             </div>
@@ -292,17 +311,19 @@ export class ReportPage extends FincaPage {
               <div>
                 <small>Flujo mensual</small
                 ><strong
-                  class=${(r.result.cashFlow ?? 0) >= 0 ? "positive" : ""}
-                  >${euro(r.result.cashFlow)}</strong
+                  class=${previewValid && (preview.cashFlow ?? 0) >= 0
+                    ? "positive"
+                    : ""}
+                  >${previewValid ? euro(preview.cashFlow) : "—"}</strong
                 >
               </div>
               <div>
                 <small>Rentabilidad neta</small
-                ><strong>${pct(r.result.netYield)}</strong>
+                ><strong>${previewValid ? pct(preview.netYield) : "—"}</strong>
               </div>
               <div>
                 <small>Capital inicial</small
-                ><strong>${euro(r.result.capital)}</strong>
+                ><strong>${previewValid ? euro(preview.capital) : "—"}</strong>
               </div>
             </div>
             <div class="report-disclaimer">
@@ -345,6 +366,13 @@ export class ReportPage extends FincaPage {
                     "above-range": "Por encima del rango",
                   } as const;
                   return html`<div class="market-assessment">
+                    ${scenarioDirty
+                      ? html`<p class="banner-note">
+                          Esta comparación pertenece a la revisión guardada.
+                          Actualiza comparables para analizar los supuestos de
+                          esta vista previa.
+                        </p>`
+                      : ""}
                     <div class="assessment-top">
                       <div>
                         <strong>${verdictLabels[analysis.verdict]}</strong>
@@ -359,24 +387,24 @@ export class ReportPage extends FincaPage {
                     </div>
                     <div class="verdict-metrics">
                       <div>
-                        <small>Precio anunciado</small
+                        <small>Precio publicado</small
                         ><strong>${euro(analysis.subjectPrice)}</strong
                         ><small>${euro(analysis.askingPricePerM2)}/m²</small>
                       </div>
                       <div>
-                        <small>Mediana estimada</small
+                        <small>Mediana de anuncios</small
                         ><strong>${euro(analysis.estimatedPrice)}</strong
                         ><small>${euro(analysis.medianPricePerM2)}/m²</small>
                       </div>
                       <div>
-                        <small>Rango central</small
+                        <small>Rango central de anuncios</small
                         ><strong
                           >${euro(analysis.rangeLow)} –
                           ${euro(analysis.rangeHigh)}</strong
                         ><small
                           >${analysis.discountPercent === null
                             ? "Sin muestra"
-                            : `${analysis.discountPercent > 0 ? "−" : "+"}${Math.abs(analysis.discountPercent)} % frente a mediana`}</small
+                            : `${analysis.discountPercent > 0 ? "−" : "+"}${Math.abs(analysis.discountPercent)} % frente a mediana (precio publicado)`}</small
                         >
                       </div>
                     </div>
@@ -390,11 +418,18 @@ export class ReportPage extends FincaPage {
                       )}
                     </p>
                     <p class="form-note">
-                      Flujo actual: ${euro(analysis.currentCashFlow)} · flujo en
-                      escenario conservador:
-                      ${euro(analysis.conservativeCashFlow)}. La señal de
-                      oportunidad exige flujo conservador no negativo, datos
-                      recientes y ausencia de alertas contractuales o
+                      Precio del escenario analizado:
+                      ${euro(analysis.scenarioPrice)}
+                      (${euro(analysis.scenarioPricePerM2)}/m²) · diferencia
+                      frente a mediana:
+                      ${analysis.scenarioDiscountPercent === null
+                        ? "sin estimación"
+                        : `${analysis.scenarioDiscountPercent} %`}
+                      · fuentes: ${analysis.sourceCount} · flujo actual:
+                      ${euro(analysis.currentCashFlow)} · flujo en escenario
+                      conservador: ${euro(analysis.conservativeCashFlow)}. La
+                      señal de oportunidad exige flujo conservador no negativo,
+                      datos recientes y ausencia de alertas contractuales o
                       hipotecarias.
                     </p>
                     ${analysis.warnings.map(

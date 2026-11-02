@@ -169,6 +169,7 @@ export interface MarketReferenceSnapshot extends MarketReferenceInput {
   importedAt: string;
 }
 export const comparableListingInputSchema = z.object({
+  listingKey: z.string().trim().min(3).max(500).optional(),
   geography: z.string().trim().min(2).max(160),
   propertyType: propertyTypeSchema,
   price: z.number().finite().min(1000).max(100_000_000),
@@ -187,6 +188,7 @@ export interface ComparableListingSnapshot extends ComparableListingInput {
 }
 export interface MarketComparable {
   id: string;
+  listingKey?: string;
   geography: string;
   price: number;
   area: number;
@@ -204,6 +206,8 @@ export interface MarketAnalysis {
   subjectArea: number;
   subjectPrice: number;
   askingPricePerM2: number;
+  scenarioPrice: number;
+  scenarioPricePerM2: number;
   currentCashFlow: number | null;
   conservativeCashFlow: number | null;
   estimatedPrice: number | null;
@@ -213,7 +217,9 @@ export interface MarketAnalysis {
   medianPricePerM2: number | null;
   highPricePerM2: number | null;
   discountPercent: number | null;
+  scenarioDiscountPercent: number | null;
   sampleSize: number;
+  sourceCount: number;
   excludedOutlierCount: number;
   recentSampleSize: number;
   confidence: "low" | "medium";

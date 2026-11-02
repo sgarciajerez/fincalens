@@ -27,6 +27,7 @@ import {
 } from "@fincalens/contracts";
 import {
   CALC_VERSION,
+  calculate,
   createReport,
   deriveMarketAnalysis,
   detectRisks,
@@ -111,6 +112,7 @@ const marketReferenceView = (row: Row): MarketReferenceSnapshot => ({
 });
 const comparableView = (row: Row): ComparableListingSnapshot => ({
   id: String(row.id),
+  ...(row.listing_key ? { listingKey: String(row.listing_key) } : {}),
   geography: String(row.geography),
   propertyType: String(
     row.property_type,
@@ -641,6 +643,12 @@ export async function createApi(
     async (req, reply) => {
       const who = await owner(req),
         base = await reportFor(req.params.id, who);
+      const requestedScenario = scenarioSchema.parse(req.body);
+      const analysisBase = {
+        ...base,
+        scenario: requestedScenario,
+        result: calculate(requestedScenario, base.snapshot, base.risks),
+      };
       if (!base.snapshot.area)
         throw new HttpError(
           422,
@@ -654,6 +662,7 @@ export async function createApi(
         const item = comparableView(row);
         return {
           id: item.id,
+          ...(item.listingKey ? { listingKey: item.listingKey } : {}),
           geography: item.geography,
           propertyType: item.propertyType,
           price: item.price,
@@ -682,13 +691,13 @@ export async function createApi(
           pricePerM2: report.snapshot.area
             ? report.snapshot.price / report.snapshot.area
             : 0,
-          observedAt: report.createdAt,
+          observedAt: report.snapshot.capturedAt.slice(0, 10),
           sourceLabel: `Cartera propia · ${report.snapshot.portal}`,
           usageTerms:
             "Anuncio guardado por el usuario; precio solicitado, no precio de cierre.",
         });
       }
-      const analysis = deriveMarketAnalysis(base, comparables);
+      const analysis = deriveMarketAnalysis(analysisBase, comparables);
       if (!analysis)
         throw new HttpError(
           422,
@@ -697,11 +706,11 @@ export async function createApi(
       const marketReference =
         base.marketReference &&
         base.snapshot.area &&
-        base.scenario.rent ===
+        requestedScenario.rent ===
           Math.round(base.snapshot.area * base.marketReference.rentPerM2)
           ? base.marketReference
           : undefined;
-      const revision = createReport(base.snapshot, base.scenario, {
+      const revision = createReport(base.snapshot, requestedScenario, {
         id: randomUUID(),
         propertyId: base.propertyId,
         parentId: base.id,
@@ -961,10 +970,11 @@ export async function createApi(
     await db.transaction(async (tx) => {
       for (const item of comparables)
         await tx.run(
-          "INSERT INTO property_comparables(id,owner_id,geography,geography_key,property_type,price,area,bedrooms,observed_at,source_label,usage_terms,imported_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+          "INSERT INTO property_comparables(id,owner_id,listing_key,geography,geography_key,property_type,price,area,bedrooms,observed_at,source_label,usage_terms,imported_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
           [
             item.id,
             who,
+            item.listingKey ?? null,
             item.geography,
             geographyKey(item.geography),
             item.propertyType,

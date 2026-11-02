@@ -214,7 +214,7 @@ export class MarketPage extends FincaPage {
   }
   private downloadComparableTemplate() {
     const csv =
-      'geography,propertyType,price,area,bedrooms,observedAt,sourceLabel,usageTerms\n"El Cabanyal · Valencia",flat,172000,72,2,2026-10-10,"Fuente autorizada","Licencia permite análisis interno"\n';
+      'listingKey,geography,propertyType,price,area,bedrooms,observedAt,sourceLabel,usageTerms\nidealista:105052300,"El Cabanyal · Valencia",flat,172000,72,2,2026-10-10,"Idealista","Licencia permite análisis interno"\n';
     const url = URL.createObjectURL(
       new Blob([csv], { type: "text/csv;charset=utf-8" }),
     );
