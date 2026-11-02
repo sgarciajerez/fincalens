@@ -4,6 +4,68 @@
 .mobile-nav {
   display: none;
 }
+.account-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--canvas);
+}
+.account-card {
+  width: min(100%, 430px);
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+.account-brand {
+  margin-bottom: 34px;
+}
+.account-card .eyebrow {
+  margin-bottom: 7px;
+}
+.account-card h1 {
+  font-size: 26px;
+}
+.account-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 24px;
+}
+.account-form label {
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.account-form input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.account-form small,
+.account-disclaimer {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.account-form .btn {
+  margin-top: 10px;
+}
+.account-error {
+  padding: 10px;
+  border-radius: 7px;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 11px;
+}
+.account-toggle {
+  margin-top: 17px;
+}
+.account-disclaimer {
+  margin-top: 24px;
+}
 .app-shell .layout-main {
   min-height: 100vh;
 }
@@ -223,6 +285,67 @@
 .checklist-row input {
   accent-color: var(--green);
   margin-top: 3px;
+}
+.market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.market-grid .panel {
+  min-width: 0;
+}
+.market-grid .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.market-grid .field {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.market-grid input,
+.market-grid select,
+.market-grid textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+.market-consent,
+.market-grid form > button {
+  grid-column: 1 / -1;
+}
+.market-list {
+  display: grid;
+}
+.market-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.market-row > div {
+  min-width: 0;
+}
+.market-row .chip {
+  margin-left: 8px;
+}
+.market-row p {
+  margin: 5px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .market-grid,
+  .market-grid .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .banner-note {
   border-radius: 9px;

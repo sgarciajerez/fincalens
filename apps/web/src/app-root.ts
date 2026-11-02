@@ -3,12 +3,16 @@ import { startApp } from "@open-cells/core";
 import { ElementController } from "@open-cells/element-controller";
 import { api } from "./api.js";
 import "./components/property-card.js";
+import "./components/account-gate.js";
 
 export class AppRoot extends LitElement {
   static properties = {
     toastMessage: { state: true },
     online: { state: true },
     current: { state: true },
+    authMode: { state: true },
+    authenticated: { state: true },
+    displayName: { state: true },
   };
   static get inbounds() {
     return {
@@ -22,6 +26,9 @@ export class AppRoot extends LitElement {
   declare toastMessage: string;
   declare online: boolean;
   declare current: string;
+  declare authMode: "checking" | "local" | "accounts";
+  declare authenticated: boolean;
+  declare displayName: string;
   declare channelToast: string;
   private controller: ElementController;
   private toastTimer: number | undefined;
@@ -30,6 +37,9 @@ export class AppRoot extends LitElement {
     this.toastMessage = "";
     this.online = true;
     this.current = "portfolio";
+    this.authMode = "checking";
+    this.authenticated = false;
+    this.displayName = "";
     this.controller = new ElementController(this);
   }
   createRenderRoot() {
@@ -38,70 +48,90 @@ export class AppRoot extends LitElement {
   firstUpdated() {
     window.addEventListener("fl-toast", this.onToast as EventListener);
     window.addEventListener("hashchange", this.onRoute);
-    void api("/v1/session")
-      .then(() => {
-        this.online = true;
-        startApp({
-          mainNode: "main-content",
-          viewLimit: 3,
-          routes: [
-            {
-              name: "portfolio",
-              path: "/",
-              component: "portfolio-page",
-              action: () => import("./pages/portfolio-page.js"),
-            },
-            {
-              name: "analyze",
-              path: "/analizar",
-              component: "analyze-page",
-              action: () => import("./pages/analyze-page.js"),
-            },
-            {
-              name: "report",
-              path: "/informe/:id",
-              component: "report-page",
-              action: () => import("./pages/report-page.js"),
-            },
-            {
-              name: "compare",
-              path: "/comparar",
-              component: "compare-page",
-              action: () => import("./pages/compare-page.js"),
-            },
-            {
-              name: "extension",
-              path: "/extension",
-              component: "extension-page",
-              action: () => import("./pages/extension-page.js"),
-            },
-            {
-              name: "settings",
-              path: "/ajustes",
-              component: "settings-page",
-              action: () => import("./pages/settings-page.js"),
-            },
-            {
-              name: "shared",
-              path: "/compartido/:token",
-              component: "shared-page",
-              action: () => import("./pages/shared-page.js"),
-            },
-            {
-              name: "not-found",
-              path: "*",
-              component: "not-found-page",
-              notFound: true,
-              action: async () => {},
-            },
-          ],
-        });
-        this.onRoute();
-      })
-      .catch(() => {
-        this.online = false;
-        this.requestUpdate();
-      });
+    void this.initialize();
+  }
+  private async initialize() {
+    try {
+      const session = await api<{
+        mode: "local" | "accounts";
+        authenticated: boolean;
+        displayName: string;
+      }>("/v1/session");
+      this.online = true;
+      this.authMode = session.mode;
+      this.authenticated = session.authenticated;
+      this.displayName = session.displayName;
+    } catch {
+      this.online = false;
+      this.authMode = "local";
+      this.authenticated = true;
+    }
+    await this.updateComplete;
+    if (this.authenticated) this.startApplication();
+  }
+  private startApplication() {
+    startApp({
+      mainNode: "main-content",
+      viewLimit: 3,
+      routes: [
+        {
+          name: "portfolio",
+          path: "/",
+          component: "portfolio-page",
+          action: () => import("./pages/portfolio-page.js"),
+        },
+        {
+          name: "analyze",
+          path: "/analizar",
+          component: "analyze-page",
+          action: () => import("./pages/analyze-page.js"),
+        },
+        {
+          name: "report",
+          path: "/informe/:id",
+          component: "report-page",
+          action: () => import("./pages/report-page.js"),
+        },
+        {
+          name: "compare",
+          path: "/comparar",
+          component: "compare-page",
+          action: () => import("./pages/compare-page.js"),
+        },
+        {
+          name: "market",
+          path: "/mercado",
+          component: "market-page",
+          action: () => import("./pages/market-page.js"),
+        },
+        {
+          name: "extension",
+          path: "/extension",
+          component: "extension-page",
+          action: () => import("./pages/extension-page.js"),
+        },
+        {
+          name: "settings",
+          path: "/ajustes",
+          component: "settings-page",
+          action: () => import("./pages/settings-page.js"),
+        },
+        {
+          name: "shared",
+          path: "/compartido/:token",
+          component: "shared-page",
+          action: () => import("./pages/shared-page.js"),
+        },
+        {
+          name: "not-found",
+          path: "*",
+          component: "not-found-page",
+          notFound: true,
+          action: async () => {},
+        },
+      ],
+    });
+    this.onRoute();
   }
   updated() {
     if (this.channelToast && this.channelToast !== this.toastMessage)
@@ -128,6 +158,7 @@ export class AppRoot extends LitElement {
           informe: "report",
           analizar: "analyze",
           comparar: "compare",
+          mercado: "market",
           extension: "extension",
           ajustes: "settings",
           compartido: "shared",
@@ -144,6 +175,14 @@ export class AppRoot extends LitElement {
     }
   }
   render() {
+    if (this.authMode === "checking")
+      return html`<main class="account-screen">
+        <p class="loading">Conectando con FincaLens…</p>
+      </main>`;
+    if (this.authMode === "accounts" && !this.authenticated)
+      return html`<main class="account-screen">
+        <fl-account-gate></fl-account-gate>
+      </main>`;
     return html`<div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#!/"
@@ -181,6 +220,11 @@ export class AppRoot extends LitElement {
             href="#!/comparar"
             class=${this.current === "comparar" ? "active" : ""}
             >⇄ <span>Comparar</span></a
+          ><a
+            data-nav
+            href="#!/mercado"
+            class=${this.current === "market" ? "active" : ""}
+            >⌖ <span>Referencias de alquiler</span></a
           >
         </nav>
         <div class="nav-label" style="margin-top:24px">HERRAMIENTAS</div>
@@ -215,7 +259,9 @@ export class AppRoot extends LitElement {
             <div class="avatar">FL</div>
             <div>
               <strong>Mi espacio</strong
-              ><small>${this.online ? "Modo local" : "API sin conexión"}</small>
+              ><small
+                >${this.online ? this.displayName : "API sin conexión"}</small
+              >
             </div>
           </div>
         </div>
@@ -233,11 +279,13 @@ export class AppRoot extends LitElement {
                     ? "Nuevo análisis"
                     : this.current === "compare"
                       ? "Comparar"
-                      : this.current === "extension"
-                        ? "Extensión"
-                        : this.current === "settings"
-                          ? "Ajustes"
-                          : "Informe compartido"}</strong
+                      : this.current === "market"
+                        ? "Referencias de alquiler"
+                        : this.current === "extension"
+                          ? "Extensión"
+                          : this.current === "settings"
+                            ? "Ajustes"
+                            : "Informe compartido"}</strong
             >
           </div>
           <div class="top-actions">
@@ -251,6 +299,7 @@ export class AppRoot extends LitElement {
         <nav class="mobile-nav" aria-label="Accesos rápidos">
           <a href="#!/">Cartera</a><a href="#!/analizar">Analizar</a>
           <a href="#!/comparar">Comparar</a><a href="#!/extension">Extensión</a>
+          <a href="#!/mercado">Mercado</a>
           <a href="#!/ajustes">Ajustes</a>
         </nav>
         <main id="main-content" class="content"></main>

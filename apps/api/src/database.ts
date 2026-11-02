@@ -11,6 +11,9 @@ export interface Database {
   close(): Promise<void>;
 }
 const schema = [
+  "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS market_references (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, geography TEXT NOT NULL, geography_key TEXT NOT NULL, geography_level TEXT NOT NULL, rent_per_m2 REAL NOT NULL, as_of TEXT NOT NULL, sample_size INTEGER, dispersion REAL, source_label TEXT NOT NULL, usage_terms TEXT NOT NULL, imported_at TEXT NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS market_lookup ON market_references(owner_id,geography_key,as_of)",
   "CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, owner_id TEXT NOT NULL, expires_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS installations (hash TEXT PRIMARY KEY, owner_id TEXT NOT NULL, created_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pairing_codes (hash TEXT PRIMARY KEY, owner_id TEXT NOT NULL, expires_at TEXT NOT NULL)",
