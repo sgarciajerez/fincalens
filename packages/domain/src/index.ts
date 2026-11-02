@@ -253,6 +253,36 @@ export function calculate(
   };
 }
 
+/** Highest purchase price up to the model limit that meets a net-yield target. */
+export function priceAtNetYield(
+  input: Scenario,
+  snapshot: ListingSnapshot,
+  risks: RiskFinding[],
+  targetYield: number,
+): number | null {
+  if (!Number.isFinite(targetYield) || targetYield < 0 || targetYield > 100)
+    return null;
+  const evaluate = (price: number) => {
+    try {
+      return calculate({ ...input, price }, snapshot, risks).netYield;
+    } catch {
+      return null;
+    }
+  };
+  const minimum = 1000;
+  const minimumYield = evaluate(minimum);
+  if (minimumYield === null || minimumYield < targetYield) return null;
+  let low = minimum;
+  let high = 100_000_000;
+  for (let i = 0; i < 60; i++) {
+    const middle = (low + high) / 2;
+    const yieldAtMiddle = evaluate(middle);
+    if (yieldAtMiddle !== null && yieldAtMiddle >= targetYield) low = middle;
+    else high = middle;
+  }
+  return Math.floor(low / 100) * 100;
+}
+
 export function preset(
   base: Scenario,
   mode: "base" | "optimistic" | "conservative",

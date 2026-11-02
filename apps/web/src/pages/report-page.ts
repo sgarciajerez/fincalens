@@ -8,7 +8,7 @@ import type {
   SaleAreaReferenceSnapshot,
 } from "@fincalens/contracts";
 import type { PropertySummary } from "@fincalens/contracts";
-import { calculate, preset } from "@fincalens/domain";
+import { calculate, preset, priceAtNetYield } from "@fincalens/domain";
 import "../components/scenario-editor.js";
 
 export class ReportPage extends FincaPage {
@@ -24,6 +24,7 @@ export class ReportPage extends FincaPage {
     marketReferences: { state: true },
     saleReferences: { state: true },
     selectedMarketReference: { state: true },
+    targetYield: { state: true },
   };
   declare report: ReportRevision | null;
   declare error: string;
@@ -36,6 +37,7 @@ export class ReportPage extends FincaPage {
   declare marketReferences: MarketReferenceSnapshot[];
   declare saleReferences: SaleAreaReferenceSnapshot[];
   declare selectedMarketReference: string;
+  declare targetYield: number;
   constructor() {
     super();
     this.report = null;
@@ -49,6 +51,7 @@ export class ReportPage extends FincaPage {
     this.marketReferences = [];
     this.saleReferences = [];
     this.selectedMarketReference = "";
+    this.targetYield = 8;
   }
   private get reportIdFromHash() {
     return location.hash.split("/").at(-1) || "";
@@ -277,6 +280,9 @@ export class ReportPage extends FincaPage {
     const hasMarketEvidence =
       !!saleReference ||
       (!!r.marketAnalysis && r.marketAnalysis.sampleSize >= 3);
+    const targetYieldPrice = previewValid
+      ? priceAtNetYield(scenario, r.snapshot, r.risks, this.targetYield)
+      : null;
     const statusLabel =
       status === "restricted"
         ? "Requiere comprobación"
@@ -405,6 +411,29 @@ export class ReportPage extends FincaPage {
                     umbral de este escenario, no una tasación ni una previsión
                     de aceptación del vendedor.`
                 : "No se puede estimar un precio de equilibrio con estos datos."}
+            </div>
+            <div class="report-disclaimer">
+              <label class="field">
+                <span>Rentabilidad neta objetivo</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  .value=${String(this.targetYield)}
+                  @input=${(event: Event) => {
+                    const value = Number(
+                      (event.target as HTMLInputElement).value,
+                    );
+                    if (Number.isFinite(value) && value >= 0 && value <= 100)
+                      this.targetYield = value;
+                  }}
+                />
+              </label>
+              Precio máximo para ese objetivo:
+              <strong>${euro(targetYieldPrice)}</strong>. Es un umbral
+              financiero; no predice el precio de cierre ni la aceptación de una
+              oferta.
             </div>
             <div class="report-disclaimer">
               Puntuación limitada a los factores financieros documentados.
