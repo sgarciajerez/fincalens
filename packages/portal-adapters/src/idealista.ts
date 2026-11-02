@@ -81,6 +81,17 @@ export function normalizeIdealista(
     capturedAt: now,
     extractorVersion: "idealista-1.0.0",
     title: raw.title.slice(0, 160),
+    propertyType: /\b(casa|chalet|villa)\b/i.test(
+      `${raw.title} ${features.join(" ")}`,
+    )
+      ? "house"
+      : /\b(habitaci[oó]n|room)\b/i.test(`${raw.title} ${features.join(" ")}`)
+        ? "room"
+        : /\b(piso|apartamento|[áa]tico|d[uú]plex)\b/i.test(
+              `${raw.title} ${features.join(" ")}`,
+            )
+          ? "flat"
+          : "unknown",
     location: raw.location.slice(0, 200),
     price,
     area: number(find(/m² construidos/i)),

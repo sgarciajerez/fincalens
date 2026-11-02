@@ -20,9 +20,17 @@ import {
   type ReportRevision,
   type PropertySummary,
   marketReferenceInputSchema,
+  comparableListingInputSchema,
+  type ComparableListingSnapshot,
+  type MarketComparable,
   type MarketReferenceSnapshot,
 } from "@fincalens/contracts";
-import { CALC_VERSION, createReport, detectRisks } from "@fincalens/domain";
+import {
+  CALC_VERSION,
+  createReport,
+  deriveMarketAnalysis,
+  detectRisks,
+} from "@fincalens/domain";
 import { examples } from "../../../packages/fixtures/src/index.js";
 import { type Database, type Row } from "./database.js";
 
@@ -97,6 +105,20 @@ const marketReferenceView = (row: Row): MarketReferenceSnapshot => ({
   asOf: String(row.as_of),
   sampleSize: row.sample_size === null ? null : Number(row.sample_size),
   dispersion: row.dispersion === null ? null : Number(row.dispersion),
+  sourceLabel: String(row.source_label),
+  usageTerms: String(row.usage_terms),
+  importedAt: String(row.imported_at),
+});
+const comparableView = (row: Row): ComparableListingSnapshot => ({
+  id: String(row.id),
+  geography: String(row.geography),
+  propertyType: String(
+    row.property_type,
+  ) as ComparableListingSnapshot["propertyType"],
+  price: Number(row.price),
+  area: Number(row.area),
+  bedrooms: row.bedrooms === null ? null : Number(row.bedrooms),
+  observedAt: String(row.observed_at),
   sourceLabel: String(row.source_label),
   usageTerms: String(row.usage_terms),
   importedAt: String(row.imported_at),
@@ -615,6 +637,99 @@ export async function createApi(
     reportFor(req.params.id, await owner(req)),
   );
   app.post<{ Params: { id: string } }>(
+    "/v1/reports/:id/market-analysis",
+    async (req, reply) => {
+      const who = await owner(req),
+        base = await reportFor(req.params.id, who);
+      if (!base.snapshot.area)
+        throw new HttpError(
+          422,
+          "Añade la superficie del inmueble antes de comparar precios.",
+        );
+      const importedRows = await db.all(
+        "SELECT * FROM property_comparables WHERE owner_id=$1",
+        [who],
+      );
+      const comparables: MarketComparable[] = importedRows.map((row) => {
+        const item = comparableView(row);
+        return {
+          id: item.id,
+          geography: item.geography,
+          propertyType: item.propertyType,
+          price: item.price,
+          area: item.area,
+          bedrooms: item.bedrooms,
+          pricePerM2: item.price / item.area,
+          observedAt: item.observedAt,
+          sourceLabel: item.sourceLabel,
+          usageTerms: item.usageTerms,
+        };
+      });
+      const portfolioRows = await db.all(
+        "SELECT p.id,r.data FROM properties p JOIN reports r ON r.id=p.report_id WHERE p.owner_id=$1 AND p.id<>$2",
+        [who, base.propertyId],
+      );
+      for (const row of portfolioRows) {
+        const report = parseReport(row);
+        if (report.snapshot.source === "example") continue;
+        comparables.push({
+          id: String(row.id),
+          geography: report.snapshot.location,
+          propertyType: report.snapshot.propertyType ?? "unknown",
+          price: report.snapshot.price,
+          area: report.snapshot.area ?? 0,
+          bedrooms: report.snapshot.bedrooms,
+          pricePerM2: report.snapshot.area
+            ? report.snapshot.price / report.snapshot.area
+            : 0,
+          observedAt: report.createdAt,
+          sourceLabel: `Cartera propia · ${report.snapshot.portal}`,
+          usageTerms:
+            "Anuncio guardado por el usuario; precio solicitado, no precio de cierre.",
+        });
+      }
+      const analysis = deriveMarketAnalysis(base, comparables);
+      if (!analysis)
+        throw new HttpError(
+          422,
+          "Añade la superficie del inmueble antes de comparar precios.",
+        );
+      const marketReference =
+        base.marketReference &&
+        base.snapshot.area &&
+        base.scenario.rent ===
+          Math.round(base.snapshot.area * base.marketReference.rentPerM2)
+          ? base.marketReference
+          : undefined;
+      const revision = createReport(base.snapshot, base.scenario, {
+        id: randomUUID(),
+        propertyId: base.propertyId,
+        parentId: base.id,
+        createdAt: now(),
+        ...(marketReference ? { marketReference } : {}),
+      });
+      revision.marketAnalysis = analysis;
+      await db.transaction(async (tx) => {
+        await tx.run(
+          "INSERT INTO reports(id,owner_id,property_id,data,created_at) VALUES($1,$2,$3,$4,$5)",
+          [
+            revision.id,
+            who,
+            revision.propertyId,
+            JSON.stringify(revision),
+            revision.createdAt,
+          ],
+        );
+        await tx.run(
+          "UPDATE properties SET report_id=$1,updated_at=$2 WHERE id=$3 AND owner_id=$4",
+          [revision.id, revision.createdAt, revision.propertyId, who],
+        );
+      });
+      reply.code(201);
+      return revision;
+    },
+  );
+  app.post<{ Params: { id: string } }>(
     "/v1/reports/:id/scenarios",
     async (req, reply) => {
       const who = await owner(req);
@@ -665,6 +780,14 @@ export async function createApi(
           );
         marketReference = candidate;
       }
+      if (
+        !marketReference &&
+        base.marketReference &&
+        base.snapshot.area &&
+        scenario.rent ===
+          Math.round(base.snapshot.area * base.marketReference.rentPerM2)
+      )
+        marketReference = base.marketReference;
       const revision = createReport(base.snapshot, scenario, {
         id: randomUUID(),
         propertyId: base.propertyId,
@@ -748,7 +871,13 @@ export async function createApi(
         .header("X-Robots-Tag", "noindex")
         .header("Referrer-Policy", "no-referrer")
         .header("Cache-Control", "no-store");
-      return parseReport(rows[0]);
+      const report = parseReport(rows[0]);
+      return report.marketAnalysis
+        ? {
+            ...report,
+            marketAnalysis: { ...report.marketAnalysis, comparables: [] },
+          }
+        : report;
     },
   );
   app.get("/v1/market-references", async (req) => {
@@ -807,6 +936,59 @@ export async function createApi(
       return { ok: true };
     },
   );
+  app.get("/v1/comparables", async (req) => {
+    const who = await owner(req);
+    const rows = await db.all(
+      "SELECT * FROM property_comparables WHERE owner_id=$1 ORDER BY observed_at DESC LIMIT 5000",
+      [who],
+    );
+    return rows.map(comparableView);
+  });
+  app.post("/v1/comparables/import", async (req, reply) => {
+    const who = await owner(req);
+    const body = z
+      .object({
+        authorized: z.literal(true),
+        comparables: z.array(comparableListingInputSchema).min(1).max(500),
+      })
+      .parse(req.body);
+    const importedAt = now();
+    const comparables = body.comparables.map((item) => ({
+      ...item,
+      id: randomUUID(),
+      importedAt,
+    }));
+    await db.transaction(async (tx) => {
+      for (const item of comparables)
+        await tx.run(
+          "INSERT INTO property_comparables(id,owner_id,geography,geography_key,property_type,price,area,bedrooms,observed_at,source_label,usage_terms,imported_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+          [
+            item.id,
+            who,
+            item.geography,
+            geographyKey(item.geography),
+            item.propertyType,
+            item.price,
+            item.area,
+            item.bedrooms,
+            item.observedAt,
+            item.sourceLabel,
+            item.usageTerms,
+            item.importedAt,
+          ],
+        );
+    });
+    reply.code(201);
+    return { imported: comparables.length, comparables };
+  });
+  app.delete<{ Params: { id: string } }>("/v1/comparables/:id", async (req) => {
+    const who = await owner(req);
+    await db.run(
+      "DELETE FROM property_comparables WHERE id=$1 AND owner_id=$2",
+      [req.params.id, who],
+    );
+    return { ok: true };
+  });
   app.get("/v1/shares", async (req) => {
     const who = await owner(req);
     return db.all(

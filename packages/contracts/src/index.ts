@@ -39,6 +39,9 @@ export const snapshotSchema = z.object({
   capturedAt: z.string().datetime(),
   extractorVersion: z.string().max(30).default("manual-1"),
   title: z.string().trim().min(1).max(160),
+  propertyType: z
+    .enum(["flat", "house", "room", "other", "unknown"])
+    .default("unknown"),
   location: z.string().trim().max(200).default("Ubicación no informada"),
   price: z.number().finite().min(1000).max(100_000_000),
   area: z.number().finite().positive().max(100_000).nullable().default(null),
@@ -52,6 +55,14 @@ export const snapshotSchema = z.object({
   previousAdvertisedPrice: z.number().positive().nullable().default(null),
 });
 export type ListingSnapshot = z.infer<typeof snapshotSchema>;
+export const propertyTypeSchema = z.enum([
+  "flat",
+  "house",
+  "room",
+  "other",
+  "unknown",
+]);
+export type PropertyType = z.infer<typeof propertyTypeSchema>;
 export interface RiskFinding {
   id: string;
   severity: "info" | "warning" | "critical";
@@ -110,6 +121,7 @@ export interface ReportRevision {
   summary: string;
   checklist: ChecklistItem[];
   marketReference: MarketReferenceSnapshot | null;
+  marketAnalysis: MarketAnalysis | null;
 }
 export interface PropertySummary {
   id: string;
@@ -155,4 +167,63 @@ export type MarketReferenceInput = z.infer<typeof marketReferenceInputSchema>;
 export interface MarketReferenceSnapshot extends MarketReferenceInput {
   id: string;
   importedAt: string;
+}
+export const comparableListingInputSchema = z.object({
+  geography: z.string().trim().min(2).max(160),
+  propertyType: propertyTypeSchema,
+  price: z.number().finite().min(1000).max(100_000_000),
+  area: z.number().finite().positive().max(100_000),
+  bedrooms: z.number().int().min(0).max(100).nullable().default(null),
+  observedAt: z.string().date(),
+  sourceLabel: z.string().trim().min(2).max(120),
+  usageTerms: z.string().trim().min(12).max(500),
+});
+export type ComparableListingInput = z.infer<
+  typeof comparableListingInputSchema
+>;
+export interface ComparableListingSnapshot extends ComparableListingInput {
+  id: string;
+  importedAt: string;
+}
+export interface MarketComparable {
+  id: string;
+  geography: string;
+  price: number;
+  area: number;
+  bedrooms: number | null;
+  pricePerM2: number;
+  observedAt: string;
+  sourceLabel: string;
+  propertyType: PropertyType;
+  usageTerms: string;
+}
+export interface MarketAnalysis {
+  computedAt: string;
+  geography: string;
+  propertyType: PropertyType;
+  subjectArea: number;
+  subjectPrice: number;
+  askingPricePerM2: number;
+  currentCashFlow: number | null;
+  conservativeCashFlow: number | null;
+  estimatedPrice: number | null;
+  rangeLow: number | null;
+  rangeHigh: number | null;
+  lowPricePerM2: number | null;
+  medianPricePerM2: number | null;
+  highPricePerM2: number | null;
+  discountPercent: number | null;
+  sampleSize: number;
+  excludedOutlierCount: number;
+  recentSampleSize: number;
+  confidence: "low" | "medium";
+  verdict:
+    | "insufficient-data"
+    | "potential"
+    | "review"
+    | "within-range"
+    | "above-range";
+  comparables: MarketComparable[];
+  explanation: string;
+  warnings: string[];
 }

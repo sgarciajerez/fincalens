@@ -30,10 +30,13 @@ export class AnalyzePage extends FincaPage {
         capturedAt: new Date().toISOString(),
         extractorVersion: "manual-1",
         title: String(data.get("title")).trim(),
+        propertyType: String(
+          data.get("propertyType"),
+        ) as ListingSnapshot["propertyType"],
         location: String(data.get("location")).trim(),
         price,
         area: Number(data.get("area")) || null,
-        bedrooms: null,
+        bedrooms: data.get("bedrooms") ? Number(data.get("bedrooms")) : null,
         bathrooms: null,
         description: String(data.get("description") || ""),
         features: [],
@@ -115,6 +118,16 @@ export class AnalyzePage extends FincaPage {
               />
             </div>
             <div class="form-field">
+              <label for="propertyType">Tipo de inmueble</label>
+              <select id="propertyType" name="propertyType">
+                <option value="flat">Piso / apartamento</option>
+                <option value="house">Casa / chalet</option>
+                <option value="room">Habitación</option>
+                <option value="other">Otro</option>
+                <option value="unknown">No lo sé</option>
+              </select>
+            </div>
+            <div class="form-field">
               <label for="location">Zona</label
               ><input
                 id="location"
@@ -139,6 +152,18 @@ export class AnalyzePage extends FincaPage {
                 <label for="area">Superficie construida (m²)</label
                 ><input id="area" name="area" type="number" min="1" step="1" />
               </div>
+            </div>
+            <div class="form-field">
+              <label for="bedrooms">Habitaciones</label>
+              <input
+                id="bedrooms"
+                name="bedrooms"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                placeholder="Opcional"
+              />
             </div>
             <div class="form-field">
               <label for="rent">Alquiler mensual estimado (€)</label

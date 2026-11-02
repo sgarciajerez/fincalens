@@ -8,6 +8,8 @@ import {
   type ObservedValue,
   type ScoreFactor,
   type MarketReferenceSnapshot,
+  type MarketAnalysis,
+  type MarketComparable,
 } from "@fincalens/contracts";
 
 export const CALC_VERSION = "1.0.0";
@@ -272,6 +274,174 @@ export function preset(
       };
 }
 
+const geographyKey = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+const percentile = (sorted: number[], fraction: number) => {
+  if (!sorted.length) return null;
+  const position = (sorted.length - 1) * fraction;
+  const lower = Math.floor(position),
+    upper = Math.ceil(position);
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+};
+
+/** Builds a transparent asking-price comparison; it is not a valuation. */
+export function deriveMarketAnalysis(
+  subject: ReportRevision,
+  source: MarketComparable[],
+  computedAt = new Date().toISOString(),
+): MarketAnalysis | null {
+  const { snapshot } = subject;
+  if (!snapshot.area || snapshot.area <= 0) return null;
+  const subjectKey = geographyKey(snapshot.location);
+  const nowMs = Date.parse(computedAt);
+  let matched = source
+    .filter((item) => {
+      if (
+        item.id === subject.propertyId ||
+        geographyKey(item.sourceLabel).length === 0
+      )
+        return false;
+      if (geographyKey(item.geography) !== subjectKey) return false;
+      if (
+        snapshot.propertyType === "unknown" ||
+        item.propertyType !== snapshot.propertyType
+      )
+        return false;
+      const areaRatio = item.area / snapshot.area!;
+      if (areaRatio < 0.7 || areaRatio > 1.3) return false;
+      if (
+        snapshot.bedrooms !== null &&
+        item.bedrooms !== null &&
+        Math.abs(snapshot.bedrooms - item.bedrooms) > 1
+      )
+        return false;
+      const observed = Date.parse(item.observedAt);
+      return (
+        Number.isFinite(observed) &&
+        observed <= nowMs &&
+        nowMs - observed <= 365 * 86400000
+      );
+    })
+    .map((item) => ({ ...item, pricePerM2: item.price / item.area }));
+  const unique = new Map<string, (typeof matched)[number]>();
+  for (const item of matched) {
+    const signature = `${geographyKey(item.geography)}|${item.propertyType}|${Math.round(item.price)}|${Math.round(item.area)}|${item.observedAt.slice(0, 10)}`;
+    if (!unique.has(signature)) unique.set(signature, item);
+  }
+  matched = [...unique.values()];
+  const allPerM2 = matched.map((item) => item.pricePerM2).sort((a, b) => a - b);
+  const initialQ1 = percentile(allPerM2, 0.25),
+    initialQ3 = percentile(allPerM2, 0.75);
+  const lowerFence =
+    initialQ1 !== null && initialQ3 !== null
+      ? initialQ1 - 1.5 * (initialQ3 - initialQ1)
+      : -Infinity;
+  const upperFence =
+    initialQ1 !== null && initialQ3 !== null
+      ? initialQ3 + 1.5 * (initialQ3 - initialQ1)
+      : Infinity;
+  const beforeOutlierFilter = matched.length;
+  if (matched.length >= 5)
+    matched = matched.filter(
+      (item) => item.pricePerM2 >= lowerFence && item.pricePerM2 <= upperFence,
+    );
+  const excludedOutlierCount = beforeOutlierFilter - matched.length;
+  const perM2 = matched.map((item) => item.pricePerM2).sort((a, b) => a - b);
+  const low = percentile(perM2, 0.25),
+    median = percentile(perM2, 0.5),
+    high = percentile(perM2, 0.75);
+  const recentSampleSize = matched.filter(
+    (item) => nowMs - Date.parse(item.observedAt) <= 90 * 86400000,
+  ).length;
+  const confidence: MarketAnalysis["confidence"] =
+    matched.length >= 5 && recentSampleSize >= Math.ceil(matched.length * 0.7)
+      ? "medium"
+      : "low";
+  const askingPricePerM2 = snapshot.price / snapshot.area;
+  const estimatedPrice =
+    median === null ? null : Math.round(median * snapshot.area);
+  const rangeLow = low === null ? null : Math.round(low * snapshot.area);
+  const rangeHigh = high === null ? null : Math.round(high * snapshot.area);
+  const discountPercent = estimatedPrice
+    ? Math.round(((estimatedPrice - snapshot.price) / estimatedPrice) * 1000) /
+      10
+    : null;
+  const enough = matched.length >= 3;
+  const belowRange = enough && low !== null && askingPricePerM2 < low;
+  let conservativeCashFlow: number | null = null;
+  try {
+    conservativeCashFlow = calculate(
+      preset(subject.scenario, "conservative"),
+      snapshot,
+      subject.risks,
+    ).cashFlow;
+  } catch {
+    /* A blocked financing scenario cannot be called an opportunity. */
+  }
+  const financeOk = conservativeCashFlow !== null && conservativeCashFlow >= 0;
+  const risksOk = !subject.risks.some(
+    (risk) => risk.needsContractRent || risk.blocksFinancing,
+  );
+  const verdict: MarketAnalysis["verdict"] = !enough
+    ? "insufficient-data"
+    : belowRange
+      ? confidence === "medium" && financeOk && risksOk
+        ? "potential"
+        : "review"
+      : high !== null && askingPricePerM2 > high
+        ? "above-range"
+        : "within-range";
+  const explanation =
+    verdict === "insufficient-data"
+      ? `Solo se encontraron ${matched.length} comparables recientes con la misma zona, tipología y superficie semejante; se necesitan al menos 3 para estimar un rango.`
+      : verdict === "potential"
+        ? `El precio anunciado queda por debajo del cuartil inferior de ${matched.length} anuncios comparables recientes. El flujo de caja sigue siendo no negativo en el escenario conservador y no hay alertas contractuales o hipotecarias detectadas; verifica el inmueble y los datos antes de decidir.`
+        : verdict === "review" && belowRange
+          ? `El precio anunciado queda por debajo del rango central, pero la muestra, su actualidad, los supuestos financieros o las alertas no permiten marcarlo como oportunidad con confianza.`
+          : verdict === "above-range"
+            ? `El precio anunciado supera el cuartil superior del rango estimado con ${matched.length} anuncios comparables.`
+            : `El precio anunciado queda dentro del rango central estimado con ${matched.length} anuncios comparables.`;
+  return {
+    computedAt,
+    geography: snapshot.location,
+    propertyType: snapshot.propertyType,
+    subjectArea: snapshot.area,
+    subjectPrice: snapshot.price,
+    askingPricePerM2: Math.round(askingPricePerM2),
+    currentCashFlow: subject.result.cashFlow,
+    conservativeCashFlow,
+    estimatedPrice,
+    rangeLow,
+    rangeHigh,
+    lowPricePerM2: low === null ? null : Math.round(low),
+    medianPricePerM2: median === null ? null : Math.round(median),
+    highPricePerM2: high === null ? null : Math.round(high),
+    discountPercent,
+    sampleSize: matched.length,
+    excludedOutlierCount,
+    recentSampleSize,
+    confidence,
+    verdict,
+    comparables: matched.sort((a, b) =>
+      b.observedAt.localeCompare(a.observedAt),
+    ),
+    explanation,
+    warnings: [
+      "Los comparables reflejan precios anunciados, no precios finales de compraventa.",
+      "No se ajusta todavía por estado, planta, ascensor, eficiencia energética ni reforma; verifica que los inmuebles sean realmente equivalentes.",
+      "El resultado es un filtro orientativo, no una tasación ni asesoramiento de inversión.",
+      ...(confidence === "low"
+        ? ["La muestra es pequeña o contiene datos con más de 90 días."]
+        : []),
+    ],
+  };
+}
+
 export function createReport(
   snapshot: ListingSnapshot,
   input: Scenario | undefined,
@@ -416,5 +586,6 @@ export function createReport(
     values,
     summary,
     checklist,
+    marketAnalysis: null,
   };
 }

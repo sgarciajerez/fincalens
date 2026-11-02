@@ -106,6 +106,22 @@ export class ReportPage extends FincaPage {
     this.scenario = preset(this.report.scenario, mode);
     this.selectedMarketReference = "";
   }
+  private async compareMarket() {
+    if (!this.report || this.busy) return;
+    this.busy = true;
+    this.error = "";
+    try {
+      const revision = await api<ReportRevision>(
+        `/v1/reports/${this.report.id}/market-analysis`,
+        { method: "POST", body: "{}" },
+      );
+      location.hash = `#!/informe/${revision.id}`;
+    } catch (error) {
+      this.error = this.message(error);
+    } finally {
+      this.busy = false;
+    }
+  }
   private useMarketReference(reference: MarketReferenceSnapshot) {
     if (!this.report || !this.scenario || !this.report.snapshot.area) return;
     this.selectedMarketReference = reference.id;
@@ -294,6 +310,127 @@ export class ReportPage extends FincaPage {
               Supuestos modificables y datos de terceros pendientes de
               verificar.
             </div>
+          </section>
+          <section class="panel report-section market-analysis-card">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">COMPARABLES DE VENTA</div>
+                <h2>Precio frente al mercado</h2>
+                <p class="form-note">
+                  La comparación usa anuncios autorizados guardados en tu
+                  cartera y anuncios importados con CSV. No consulta Idealista
+                  automáticamente.
+                </p>
+              </div>
+              ${html`<button
+                class="btn btn-primary"
+                ?disabled=${this.busy || !r.snapshot.area}
+                @click=${() => this.compareMarket()}
+              >
+                ${this.busy
+                  ? "Comparando…"
+                  : r.marketAnalysis
+                    ? "Actualizar comparables"
+                    : "Buscar comparables"}
+              </button>`}
+            </div>
+            ${r.marketAnalysis
+              ? (() => {
+                  const analysis = r.marketAnalysis;
+                  const verdictLabels = {
+                    "insufficient-data": "Faltan comparables",
+                    potential: "Posible oportunidad · verificar",
+                    review: "Revisión necesaria",
+                    "within-range": "Dentro del rango",
+                    "above-range": "Por encima del rango",
+                  } as const;
+                  return html`<div class="market-assessment">
+                    <div class="assessment-top">
+                      <div>
+                        <strong>${verdictLabels[analysis.verdict]}</strong>
+                        <p>${analysis.explanation}</p>
+                      </div>
+                      <span class="chip"
+                        >Confianza
+                        ${analysis.confidence === "medium"
+                          ? "media"
+                          : "baja"}</span
+                      >
+                    </div>
+                    <div class="verdict-metrics">
+                      <div>
+                        <small>Precio anunciado</small
+                        ><strong>${euro(analysis.subjectPrice)}</strong
+                        ><small>${euro(analysis.askingPricePerM2)}/m²</small>
+                      </div>
+                      <div>
+                        <small>Mediana estimada</small
+                        ><strong>${euro(analysis.estimatedPrice)}</strong
+                        ><small>${euro(analysis.medianPricePerM2)}/m²</small>
+                      </div>
+                      <div>
+                        <small>Rango central</small
+                        ><strong
+                          >${euro(analysis.rangeLow)} –
+                          ${euro(analysis.rangeHigh)}</strong
+                        ><small
+                          >${analysis.discountPercent === null
+                            ? "Sin muestra"
+                            : `${analysis.discountPercent > 0 ? "−" : "+"}${Math.abs(analysis.discountPercent)} % frente a mediana`}</small
+                        >
+                      </div>
+                    </div>
+                    <p class="form-note">
+                      ${analysis.sampleSize} comparables ·
+                      ${analysis.recentSampleSize} con menos de 90 días ·
+                      ${analysis.excludedOutlierCount} valores atípicos
+                      excluidos · calculado
+                      ${new Date(analysis.computedAt).toLocaleDateString(
+                        "es-ES",
+                      )}
+                    </p>
+                    <p class="form-note">
+                      Flujo actual: ${euro(analysis.currentCashFlow)} · flujo en
+                      escenario conservador:
+                      ${euro(analysis.conservativeCashFlow)}. La señal de
+                      oportunidad exige flujo conservador no negativo, datos
+                      recientes y ausencia de alertas contractuales o
+                      hipotecarias.
+                    </p>
+                    ${analysis.warnings.map(
+                      (warning) =>
+                        html`<div class="banner-note" style="margin-top:8px">
+                          ${warning}
+                        </div>`,
+                    )}
+                    <details class="market-details">
+                      <summary>Ver comparables y procedencia</summary>
+                      <div class="market-list">
+                        ${analysis.comparables.map(
+                          (item) =>
+                            html`<div class="market-row">
+                              <div>
+                                <strong>${item.sourceLabel}</strong>
+                                <p>
+                                  ${item.geography} ·
+                                  ${item.price.toLocaleString("es-ES")} € ·
+                                  ${item.area} m² ·
+                                  ${item.pricePerM2.toLocaleString("es-ES")}
+                                  €/m² · ${item.observedAt}
+                                </p>
+                                <p class="form-note">${item.usageTerms}</p>
+                              </div>
+                            </div>`,
+                        )}
+                      </div>
+                    </details>
+                  </div>`;
+                })()
+              : html`<p class="form-note">
+                  Busca comparables para estimar el rango de precio de anuncio
+                  en esta zona y tipología. FincaLens conserva el resultado en
+                  una nueva revisión del informe.
+                </p>`}
           </section>
           <section class="panel report-section">
             <div class="section-heading">

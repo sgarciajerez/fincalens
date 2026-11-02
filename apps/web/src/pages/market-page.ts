@@ -4,6 +4,8 @@ import { api, notify } from "../api.js";
 import type {
   MarketReferenceInput,
   MarketReferenceSnapshot,
+  ComparableListingInput,
+  ComparableListingSnapshot,
 } from "@fincalens/contracts";
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -45,21 +47,25 @@ export class MarketPage extends FincaPage {
     references: { state: true },
     error: { state: true },
     busy: { state: true },
+    comparables: { state: true },
   };
   declare references: MarketReferenceSnapshot[];
   declare error: string;
   declare busy: boolean;
+  declare comparables: ComparableListingSnapshot[];
   constructor() {
     super();
     this.references = [];
     this.error = "";
     this.busy = false;
+    this.comparables = [];
   }
   protected async load() {
     try {
-      this.references = await api<MarketReferenceSnapshot[]>(
-        "/v1/market-references",
-      );
+      [this.references, this.comparables] = await Promise.all([
+        api<MarketReferenceSnapshot[]>("/v1/market-references"),
+        api<ComparableListingSnapshot[]>("/v1/comparables"),
+      ]);
       this.error = "";
     } catch (error) {
       this.error = this.message(error);
@@ -147,6 +153,53 @@ export class MarketPage extends FincaPage {
       this.error = this.message(error);
     }
   }
+  private async submitComparablesCsv(event: SubmitEvent) {
+    event.preventDefault();
+    this.error = "";
+    const form = event.currentTarget as HTMLFormElement,
+      data = new FormData(form);
+    if (!data.get("authorized")) {
+      this.error = "Confirma que tienes derecho a usar y procesar estos datos.";
+      return;
+    }
+    try {
+      const rows = parseCsv(String(data.get("compsCsv") || ""));
+      if (rows.length > 500)
+        throw new Error("El límite es de 500 anuncios por importación.");
+      const comparables: ComparableListingInput[] = rows.map((row) => ({
+        geography: row.geography,
+        propertyType:
+          row.propertyType as ComparableListingInput["propertyType"],
+        price: Number(row.price),
+        area: Number(row.area),
+        bedrooms: row.bedrooms ? Number(row.bedrooms) : null,
+        observedAt: row.observedAt,
+        sourceLabel: row.sourceLabel,
+        usageTerms: row.usageTerms,
+      }));
+      this.busy = true;
+      const result = await api<{ imported: number }>("/v1/comparables/import", {
+        method: "POST",
+        body: JSON.stringify({ authorized: true, comparables }),
+      });
+      form.reset();
+      await this.load();
+      notify(`${result.imported} anuncios comparables importados.`);
+    } catch (error) {
+      this.error = this.message(error);
+    } finally {
+      this.busy = false;
+    }
+  }
+  private async deleteComparable(id: string) {
+    try {
+      await api(`/v1/comparables/${id}`, { method: "DELETE" });
+      await this.load();
+      notify("Comparable eliminado.");
+    } catch (error) {
+      this.error = this.message(error);
+    }
+  }
   private downloadTemplate() {
     const csv =
       'geography,level,rentPerM2,asOf,sampleSize,dispersion,sourceLabel,usageTerms\n"El Cabanyal · Valencia",neighborhood,13.5,2026-10-01,42,2.1,"Fuente licenciada","Uso autorizado para análisis interno"\n';
@@ -156,6 +209,18 @@ export class MarketPage extends FincaPage {
     const link = document.createElement("a");
     link.href = url;
     link.download = "fincalens-referencias-alquiler.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  private downloadComparableTemplate() {
+    const csv =
+      'geography,propertyType,price,area,bedrooms,observedAt,sourceLabel,usageTerms\n"El Cabanyal · Valencia",flat,172000,72,2,2026-10-10,"Fuente autorizada","Licencia permite análisis interno"\n';
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "fincalens-comparables.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -300,6 +365,69 @@ export class MarketPage extends FincaPage {
           </form>
         </section>
       </div>
+      <section class="panel report-section">
+        <div class="panel-head">
+          <div>
+            <h2>Anuncios comparables</h2>
+            <p class="form-note">
+              Importa anuncios de venta con derechos de uso. FincaLens los
+              compara por coincidencia exacta de zona, tipología, superficie ±30
+              % y habitaciones próximas. Los precios son de anuncio, no de
+              cierre.
+            </p>
+          </div>
+          <button class="btn btn-sm" @click=${this.downloadComparableTemplate}>
+            Descargar plantilla
+          </button>
+        </div>
+        <form
+          @submit=${(event: SubmitEvent) => this.submitComparablesCsv(event)}
+        >
+          <label class="field"
+            ><span>CSV de anuncios comparables</span
+            ><textarea
+              name="compsCsv"
+              required
+              rows="6"
+              placeholder="geography,propertyType,price,area,bedrooms,observedAt,sourceLabel,usageTerms"
+            ></textarea></label
+          ><label class="checklist-row market-consent"
+            ><input name="authorized" type="checkbox" required /><span
+              >Confirmo que puedo importar y procesar los anuncios y que su uso
+              permite este análisis.</span
+            ></label
+          ><button class="btn" ?disabled=${this.busy}>
+            ${this.busy ? "Importando…" : "Importar comparables"}
+          </button>
+        </form>
+        <div class="market-list">
+          ${this.comparables.map(
+            (item) =>
+              html`<article class="market-row">
+                <div>
+                  <strong>${item.geography}</strong
+                  ><span class="chip">${item.propertyType}</span>
+                  <p>
+                    ${item.price.toLocaleString("es-ES")} € · ${item.area} m² ·
+                    ${item.bedrooms === null
+                      ? "habitaciones desconocidas"
+                      : `${item.bedrooms} hab.`}
+                    · ${item.observedAt}
+                  </p>
+                  <p class="form-note">
+                    ${item.sourceLabel} · ${item.usageTerms}
+                  </p>
+                </div>
+                <button
+                  class="btn btn-sm"
+                  @click=${() => this.deleteComparable(item.id)}
+                >
+                  Eliminar
+                </button>
+              </article>`,
+          )}
+        </div>
+      </section>
       <section class="panel report-section">
         <div class="panel-head">
           <div>
