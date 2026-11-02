@@ -260,6 +260,23 @@ export class ReportPage extends FincaPage {
       previewValid = false;
     }
     const status = previewValid ? preview.decision : "restricted";
+    const geographyNames = this.geographyNames(r.snapshot.location);
+    const saleReference = this.saleReferences
+      .filter((item) =>
+        geographyNames.has(this.normalizeGeography(item.geography)),
+      )
+      .sort(
+        (a, b) =>
+          ["neighborhood", "district", "municipality", "province"].indexOf(
+            a.level,
+          ) -
+          ["neighborhood", "district", "municipality", "province"].indexOf(
+            b.level,
+          ),
+      )[0];
+    const hasMarketEvidence =
+      !!saleReference ||
+      (!!r.marketAnalysis && r.marketAnalysis.sampleSize >= 3);
     const statusLabel =
       status === "restricted"
         ? "Requiere comprobación"
@@ -268,7 +285,9 @@ export class ReportPage extends FincaPage {
           : status === "caution"
             ? "Flujo negativo"
             : status === "interesting"
-              ? "Escenario favorable"
+              ? hasMarketEvidence
+                ? "Finanzas favorables · mercado orientativo"
+                : "Finanzas favorables · mercado sin validar"
               : "Revisión necesaria";
     return html`<header class="page-head report-head">
         <div>
@@ -338,7 +357,9 @@ export class ReportPage extends FincaPage {
                     ? "Este escenario no se puede calcular con los datos actuales. Revisa los campos o las restricciones de financiación."
                     : scenarioDirty
                       ? "Lectura calculada con los supuestos editados. Guarda el escenario para crear una revisión permanente."
-                      : r.summary}
+                      : status === "interesting" && !hasMarketEvidence
+                        ? "El escenario financiero cumple las reglas del modelo. Falta una referencia de mercado para contextualizar el precio; verifica alquiler, costes y documentación antes de decidir."
+                        : r.summary}
                 </p>
               </div>
               <div class="score-ring">
@@ -655,40 +676,38 @@ export class ReportPage extends FincaPage {
           <section class="panel report-section">
             <h2>Referencia de venta de la zona</h2>
             ${(() => {
-              const key = this.normalizeGeography(r.snapshot.location);
-              const reference = this.saleReferences
-                .filter((item) =>
-                  this.matchesGeography(item.geography, r.snapshot.location),
-                )
-                .sort(
-                  (a, b) =>
-                    [
-                      "neighborhood",
-                      "district",
-                      "municipality",
-                      "province",
-                    ].indexOf(a.level) -
-                    [
-                      "neighborhood",
-                      "district",
-                      "municipality",
-                      "province",
-                    ].indexOf(b.level),
-                )[0];
-              return reference
+              return saleReference
                 ? html`<div class="risk-row">
                     <strong
-                      >${euro(reference.salePricePerM2)}/m² ·
-                      ${reference.level}</strong
+                      >${euro(saleReference.salePricePerM2)}/m² ·
+                      ${saleReference.level}</strong
                     >
                     <p>
-                      Referencia agregada de ${reference.geography}; no es una
-                      tasación. ${reference.sourceLabel} · datos de
-                      ${reference.asOf}${reference.sampleSize
-                        ? ` · muestra ${reference.sampleSize}`
+                      Referencia agregada de ${saleReference.geography}; no es
+                      una tasación. ${saleReference.sourceLabel} · datos de
+                      ${saleReference.asOf}${saleReference.sampleSize
+                        ? ` · muestra ${saleReference.sampleSize}`
                         : ""}
                     </p>
-                    <p>${reference.usageTerms}</p>
+                    <p>
+                      Precio anunciado:
+                      ${euro(
+                        r.snapshot.area
+                          ? r.snapshot.price / r.snapshot.area
+                          : null,
+                      )}/m².
+                      ${r.snapshot.area
+                        ? `${((r.snapshot.price / r.snapshot.area / saleReference.salePricePerM2 - 1) * 100).toLocaleString("es-ES", { maximumFractionDigits: 1, signDisplay: "always" })}% frente a la referencia. Comparación de precios de oferta.`
+                        : "Añade la superficie para comparar €/m²."}
+                    </p>
+                    ${Date.now() - Date.parse(saleReference.asOf) >
+                    180 * 86400000
+                      ? html`<p class="banner-note">
+                          Referencia de más de seis meses: confirma un dato más
+                          reciente.
+                        </p>`
+                      : ""}
+                    <p>${saleReference.usageTerms}</p>
                   </div>`
                 : html`<p class="form-note">
                     No hay referencia de venta para la zona exacta de este
