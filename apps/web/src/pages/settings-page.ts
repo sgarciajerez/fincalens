@@ -13,22 +13,38 @@ export class SettingsPage extends FincaPage {
     shares: { state: true },
     error: { state: true },
     busy: { state: true },
+    accountMode: { state: true },
+    displayName: { state: true },
   };
   declare shares: Share[];
   declare error: string;
   declare busy: boolean;
+  declare accountMode: boolean;
+  declare displayName: string;
   constructor() {
     super();
     this.shares = [];
     this.error = "";
     this.busy = false;
+    this.accountMode = false;
+    this.displayName = "";
   }
   protected async load() {
     try {
-      this.shares = await api<Share[]>("/v1/shares");
+      const [shares, session] = await Promise.all([
+        api<Share[]>("/v1/shares"),
+        api<{ mode: string; displayName: string }>("/v1/session"),
+      ]);
+      this.shares = shares;
+      this.accountMode = session.mode === "accounts";
+      this.displayName = session.displayName;
     } catch (e) {
       this.error = this.message(e);
     }
+  }
+  private async logout() {
+    await api("/v1/auth/logout", { method: "POST", body: "{}" });
+    location.reload();
   }
   private async revoke(id: string) {
     try {
@@ -96,12 +112,19 @@ export class SettingsPage extends FincaPage {
         <h2>Espacio de trabajo</h2>
         <div class="settings-row">
           <div>
-            <strong>Modo</strong>
+            <strong>Cuenta</strong>
             <p>
-              Desarrollo local · SQLite · un espacio de usuario en este equipo
+              ${this.displayName || "Espacio local"} ·
+              ${this.accountMode
+                ? "cuenta independiente"
+                : "modo local de usuario único"}
             </p>
           </div>
-          <span class="chip">Solo local</span>
+          ${this.accountMode
+            ? html`<button class="btn btn-sm" @click=${() => this.logout()}>
+                Cerrar sesión
+              </button>`
+            : html`<span class="chip">Solo local</span>`}
         </div>
         <div class="settings-row">
           <div>
@@ -114,8 +137,9 @@ export class SettingsPage extends FincaPage {
           <span class="chip">Sin proveedor</span>
         </div>
         <div class="banner-note">
-          Este prototipo aún no ofrece autenticación multiusuario ni despliegue
-          público. No incluyas información personal sensible.
+          ${this.accountMode
+            ? "El modo de cuentas está pensado para desarrollo local: todavía no incluye verificación de correo, recuperación de contraseña ni protección de despliegue público."
+            : "Este espacio local no ofrece separación por cuentas. No incluyas información personal sensible."}
         </div>
       </section>
       <section class="panel report-section">

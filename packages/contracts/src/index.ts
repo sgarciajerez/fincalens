@@ -109,6 +109,7 @@ export interface ReportRevision {
   values: Record<string, ObservedValue<number>>;
   summary: string;
   checklist: ChecklistItem[];
+  marketReference: MarketReferenceSnapshot | null;
 }
 export interface PropertySummary {
   id: string;
@@ -139,3 +140,19 @@ export const analysisInputSchema = z.object({
   scenario: scenarioSchema.optional(),
 });
 export type AnalysisInput = z.infer<typeof analysisInputSchema>;
+
+export const marketReferenceInputSchema = z.object({
+  geography: z.string().trim().min(2).max(160),
+  level: z.enum(["neighborhood", "district", "municipality", "province"]),
+  rentPerM2: z.number().finite().min(0.1).max(200),
+  asOf: z.string().date(),
+  sampleSize: z.number().int().min(1).max(1_000_000).nullable().default(null),
+  dispersion: z.number().finite().min(0).max(100).nullable().default(null),
+  sourceLabel: z.string().trim().min(2).max(120),
+  usageTerms: z.string().trim().min(12).max(500),
+});
+export type MarketReferenceInput = z.infer<typeof marketReferenceInputSchema>;
+export interface MarketReferenceSnapshot extends MarketReferenceInput {
+  id: string;
+  importedAt: string;
+}

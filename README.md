@@ -2,7 +2,7 @@
 
 FincaLens es un proyecto de portfolio para explorar una aplicación de análisis de inmuebles con **Lit**, **Open Cells** y una extensión **Chrome Manifest V3**. Captura datos públicos de un anuncio, hace explícitos los supuestos financieros y permite comparar y revisar escenarios.
 
-> Prototipo local para desarrollo y demostración. No ofrece autenticación multiusuario ni está preparado para alojar datos de clientes. Los alquileres, impuestos, costes y alertas deben verificarse de forma independiente.
+> Proyecto de portfolio en desarrollo. Incluye cuentas locales opcionales y referencias de alquiler aportadas por el usuario; todavía no es un servicio público listo para datos de clientes. Los alquileres, impuestos, costes y alertas deben verificarse de forma independiente.
 
 ## Qué incluye
 
@@ -12,6 +12,8 @@ FincaLens es un proyecto de portfolio para explorar una aplicación de análisis
 - Revisiones inmutables para escenarios optimistas y conservadores, con enlace temporal de solo lectura revocable.
 - Extensión Chrome MV3 que captura texto visible de anuncios de Idealista España después de que el usuario pulse el botón.
 - API Fastify, SQLite por defecto y PostgreSQL opcional.
+- Modo opcional de cuentas locales con contraseñas derivadas, sesiones aisladas por usuario y cierre de sesión. El modo local de usuario único sigue siendo el predeterminado.
+- Registro manual o CSV de referencias de alquiler, con fuente, fecha, muestra y condiciones declaradas. Se aplican a un informe de forma explícita y la revisión conserva una copia de la procedencia.
 - Cálculo financiero TypeScript compartido y determinista. Sin rentas de mercado ni puntuaciones generadas por IA.
 
 Los cuatro inmuebles de demostración son ejemplos sintéticos, no anuncios reales.
@@ -31,6 +33,10 @@ npm run dev
 
 Abre <http://127.0.0.1:4173>. La aplicación web y la API se ejecutan en tu equipo; la API escucha solo en `127.0.0.1:4174`. SQLite crea su base en `work/data/fincalens.sqlite` (excluida de Git). Desde la cartera puedes cargar ejemplos sintéticos para explorar informes y comparativas.
 
+Por defecto se usa una única cartera local (`AUTH_MODE=local`). Para habilitar varias cuentas locales, configura `AUTH_MODE=accounts` en `.env`; se solicitará registro e inicio de sesión en la aplicación. Las contraseñas requieren al menos 12 caracteres. Las cuentas no incluyen verificación de correo ni recuperación de contraseña. Para publicar detrás de HTTPS, revisa primero `COOKIE_SECURE=true`, `WEB_ORIGIN` y la sección de limitaciones.
+
+La página **Referencias de alquiler** admite datos añadidos manualmente o pegados como CSV. La importación requiere que confirmes que tienes derecho a procesar los datos y guardar las condiciones de uso declaradas. No se descargan automáticamente comparables ni se extraen datos de Idealista para alimentar esas referencias. En un informe, la aplicación muestra solo la coincidencia exacta de zona; al elegir **Usar en escenario**, calcula superficie × €/m² y guarda esa referencia en una nueva revisión.
+
 ## Extensión Chrome
 
 ```sh
@@ -43,14 +49,14 @@ La extensión solicita acceso a la pestaña activa, almacenamiento local y pági
 
 ## Comandos
 
-| Comando | Acción |
-| --- | --- |
-| `npm run dev` | API y aplicación web en modo desarrollo |
-| `npm run build` | Bundle web y extensión MV3 en `dist/` |
-| `npm run typecheck` | Comprobación estática TypeScript |
-| `npm test` | Pruebas del motor, API y adaptador |
+| Comando                  | Acción                                   |
+| ------------------------ | ---------------------------------------- |
+| `npm run dev`            | API y aplicación web en modo desarrollo  |
+| `npm run build`          | Bundle web y extensión MV3 en `dist/`    |
+| `npm run typecheck`      | Comprobación estática TypeScript         |
+| `npm test`               | Pruebas del motor, API y adaptador       |
 | `npm run test:prototype` | Comprobación del prototipo HTML original |
-| `npm run format` | Formato Prettier de las fuentes |
+| `npm run format`         | Formato Prettier de las fuentes          |
 
 ## Estructura
 
@@ -71,11 +77,11 @@ tests/                 Cobertura del dominio y los flujos HTTP
 ## Limitaciones conocidas
 
 - El extractor depende de la estructura pública visible de Idealista y puede necesitar adaptación cuando cambie el sitio.
-- No hay proveedor de alquileres comparables, valoración automática, OCR ni análisis mediante IA.
+- No hay proveedor de alquileres comparables, valoración automática, OCR ni análisis mediante IA. Las referencias de alquiler las aporta el usuario y su licencia o exactitud no se verifica automáticamente.
 - Los impuestos se representan como porcentaje supuesto; no se calcula el impuesto autonómico aplicable a cada operación.
-- El espacio local es de usuario único y el modo de enlace compartido es público por URL hasta su caducidad o revocación.
+- Las cuentas integradas son para ejecución local: faltan verificación de correo, recuperación segura de contraseña, administración de sesiones y protección operativa para un servicio público. El modo de enlace compartido es público por URL hasta su caducidad o revocación.
 - La configuración de PostgreSQL es opcional; el desarrollo por defecto no requiere Docker.
-- Antes de un despliegue público hacen falta autenticación multiusuario, gestión de secretos, cuotas, observabilidad, copias y una revisión legal de las fuentes de datos.
+- Antes de un despliegue público hacen falta verificación de correo, recuperación de contraseña, gestión de sesiones y secretos, cuotas, observabilidad, copias y una revisión legal de las fuentes de datos.
 
 ## Tecnologías
 

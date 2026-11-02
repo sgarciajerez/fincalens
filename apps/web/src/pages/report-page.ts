@@ -1,7 +1,11 @@
 import { html } from "lit";
 import { FincaPage } from "../page.js";
 import { api, euro, pct, notify } from "../api.js";
-import type { ReportRevision, Scenario } from "@fincalens/contracts";
+import type {
+  MarketReferenceSnapshot,
+  ReportRevision,
+  Scenario,
+} from "@fincalens/contracts";
 import type { PropertySummary } from "@fincalens/contracts";
 import { preset } from "@fincalens/domain";
 import "../components/scenario-editor.js";
@@ -16,6 +20,8 @@ export class ReportPage extends FincaPage {
     shareUrl: { state: true },
     propertyNotes: { state: true },
     observations: { state: true },
+    marketReferences: { state: true },
+    selectedMarketReference: { state: true },
   };
   declare report: ReportRevision | null;
   declare error: string;
@@ -25,6 +31,8 @@ export class ReportPage extends FincaPage {
   declare shareUrl: string;
   declare propertyNotes: string;
   declare observations: PropertySummary["observations"];
+  declare marketReferences: MarketReferenceSnapshot[];
+  declare selectedMarketReference: string;
   constructor() {
     super();
     this.report = null;
@@ -35,6 +43,8 @@ export class ReportPage extends FincaPage {
     this.shareUrl = "";
     this.propertyNotes = "";
     this.observations = [];
+    this.marketReferences = [];
+    this.selectedMarketReference = "";
   }
   private get reportIdFromHash() {
     return location.hash.split("/").at(-1) || "";
@@ -45,11 +55,12 @@ export class ReportPage extends FincaPage {
         `/v1/reports/${encodeURIComponent(this.reportIdFromHash)}`,
       );
       this.scenario = { ...this.report.scenario };
-      const [checks, properties] = await Promise.all([
+      const [checks, properties, marketReferences] = await Promise.all([
         api<Record<string, boolean>>(
           `/v1/checklists/${this.report.propertyId}`,
         ),
         api<PropertySummary[]>("/v1/properties"),
+        api<MarketReferenceSnapshot[]>("/v1/market-references"),
       ]);
       this.checks = checks;
       const property = properties.find(
@@ -57,6 +68,8 @@ export class ReportPage extends FincaPage {
       );
       this.propertyNotes = property?.notes || "";
       this.observations = property?.observations || [];
+      this.marketReferences = marketReferences;
+      this.selectedMarketReference = "";
       this.shareUrl = "";
       this.error = "";
     } catch (e) {
@@ -69,7 +82,17 @@ export class ReportPage extends FincaPage {
     try {
       const revision = await api<ReportRevision>(
         `/v1/reports/${this.report.id}/scenarios`,
-        { method: "POST", body: JSON.stringify(this.scenario) },
+        {
+          method: "POST",
+          body: JSON.stringify(
+            this.selectedMarketReference
+              ? {
+                  scenario: this.scenario,
+                  marketReferenceId: this.selectedMarketReference,
+                }
+              : this.scenario,
+          ),
+        },
       );
       location.hash = `#!/informe/${revision.id}`;
     } catch (e) {
@@ -81,6 +104,25 @@ export class ReportPage extends FincaPage {
   private async preset(mode: "base" | "optimistic" | "conservative") {
     if (!this.report) return;
     this.scenario = preset(this.report.scenario, mode);
+    this.selectedMarketReference = "";
+  }
+  private useMarketReference(reference: MarketReferenceSnapshot) {
+    if (!this.report || !this.scenario || !this.report.snapshot.area) return;
+    this.selectedMarketReference = reference.id;
+    this.scenario = {
+      ...this.scenario,
+      rent: Math.round(this.report.snapshot.area * reference.rentPerM2),
+    };
+    notify(
+      "Supuesto de renta calculado. Se guardará la referencia y su procedencia en la nueva revisión.",
+    );
+  }
+  private normalizeGeography(value: string) {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
   }
   private async checklist(id: string, checked: boolean) {
     if (!this.report) return;
@@ -323,8 +365,10 @@ export class ReportPage extends FincaPage {
             <fl-scenario-editor
               .value=${this.scenario}
               .restricted=${r.risks.some((risk) => risk.blocksFinancing)}
-              @scenario-change=${(event: CustomEvent<Scenario>) =>
-                (this.scenario = event.detail)}
+              @scenario-change=${(event: CustomEvent<Scenario>) => (
+                (this.scenario = event.detail),
+                (this.selectedMarketReference = "")
+              )}
             ></fl-scenario-editor>
             <div class="form-actions">
               <button
@@ -337,6 +381,12 @@ export class ReportPage extends FincaPage {
                   : "Guardar escenario como nueva revisión"}
               </button>
             </div>
+            ${this.selectedMarketReference
+              ? html`<p class="form-note">
+                  Se guardará la referencia zonal seleccionada junto con esta
+                  revisión.
+                </p>`
+              : ""}
             <div style="overflow:auto;margin-top:18px">
               <table class="comparison-table">
                 <thead>
@@ -412,11 +462,28 @@ export class ReportPage extends FincaPage {
                 ${euro(r.scenario.rent)} ·
                 ${r.values.rent.source === "default"
                   ? "sin informar"
-                  : r.values.rent.source === "user"
-                    ? "aportado por usuario"
-                    : "ejemplo sintético"}
+                  : r.values.rent.source === "market"
+                    ? "derivado de referencia zonal elegida"
+                    : r.values.rent.source === "user"
+                      ? "aportado por usuario"
+                      : "ejemplo sintético"}
               </p>
             </div>
+            ${r.marketReference
+              ? html`<div class="risk-row">
+                  <strong>Procedencia de la referencia</strong>
+                  <p>
+                    ${r.marketReference.sourceLabel} ·
+                    ${r.marketReference.geography} ·
+                    ${r.marketReference.rentPerM2.toLocaleString("es-ES")}
+                    €/m²/mes · datos de
+                    ${r.marketReference.asOf}${r.marketReference.sampleSize
+                      ? ` · muestra ${r.marketReference.sampleSize}`
+                      : ""}
+                  </p>
+                  <p>${r.marketReference.usageTerms}</p>
+                </div>`
+              : ""}
             <div class="risk-row">
               <strong>Confianza global</strong>
               <p>
@@ -431,6 +498,70 @@ export class ReportPage extends FincaPage {
                   ${warning}
                 </div>`,
             )}
+          </section>
+          <section class="panel mt">
+            <h2>Referencia de alquiler</h2>
+            ${this.report.snapshot.area
+              ? html`<p class="form-note">
+                    Solo aparecen referencias de la misma zona escrita en el
+                    anuncio (${this.report.snapshot.location}). El importe
+                    calculado es un supuesto orientativo por superficie.
+                  </p>
+                  ${this.report.risks.some((risk) => risk.needsContractRent)
+                    ? html`<p class="banner-note">
+                        Esta ficha requiere comprobar primero el alquiler
+                        contractual o las restricciones aplicables.
+                      </p>`
+                    : this.marketReferences.filter(
+                          (reference) =>
+                            this.normalizeGeography(reference.geography) ===
+                            this.normalizeGeography(
+                              this.report!.snapshot.location,
+                            ),
+                        ).length
+                      ? this.marketReferences
+                          .filter(
+                            (reference) =>
+                              this.normalizeGeography(reference.geography) ===
+                              this.normalizeGeography(
+                                this.report!.snapshot.location,
+                              ),
+                          )
+                          .map(
+                            (reference) =>
+                              html`<div class="risk-row">
+                                <strong
+                                  >${reference.rentPerM2.toLocaleString(
+                                    "es-ES",
+                                  )}
+                                  €/m²/mes</strong
+                                >
+                                <p>
+                                  ${reference.sourceLabel} ·
+                                  ${reference.asOf}${reference.sampleSize
+                                    ? ` · n=${reference.sampleSize}`
+                                    : ""}
+                                </p>
+                                <button
+                                  class="btn btn-sm"
+                                  @click=${() =>
+                                    this.useMarketReference(reference)}
+                                >
+                                  Usar en escenario
+                                </button>
+                              </div>`,
+                          )
+                      : html`<p class="form-note">
+                          No hay referencias guardadas con coincidencia exacta
+                          de zona.
+                        </p>`}
+                  <a class="text-link" href="#!/mercado"
+                    >Gestionar referencias →</a
+                  >`
+              : html`<p class="form-note">
+                  Añade la superficie al anuncio para calcular un supuesto con
+                  referencias.
+                </p>`}
           </section>
           <section class="panel mt">
             <h2>Notas privadas</h2>

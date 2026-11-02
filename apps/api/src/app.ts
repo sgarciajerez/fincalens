@@ -1,7 +1,15 @@
-import Fastify, { type FastifyRequest } from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  randomUUID,
+  scrypt as nodeScrypt,
+  timingSafeEqual,
+  type ScryptOptions,
+} from "node:crypto";
 import { z } from "zod";
 import {
   analysisInputSchema,
@@ -11,8 +19,10 @@ import {
   type AnalysisInput,
   type ReportRevision,
   type PropertySummary,
+  marketReferenceInputSchema,
+  type MarketReferenceSnapshot,
 } from "@fincalens/contracts";
-import { CALC_VERSION, createReport } from "@fincalens/domain";
+import { CALC_VERSION, createReport, detectRisks } from "@fincalens/domain";
 import { examples } from "../../../packages/fixtures/src/index.js";
 import { type Database, type Row } from "./database.js";
 
@@ -20,6 +30,48 @@ const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const now = () => new Date().toISOString();
 const token = () => randomBytes(32).toString("base64url");
+const scrypt = (
+  password: string,
+  salt: Buffer,
+  length: number,
+  options: ScryptOptions,
+) =>
+  new Promise<Buffer>((resolve, reject) => {
+    nodeScrypt(password, salt, length, options, (error, key) => {
+      if (error) reject(error);
+      else resolve(key);
+    });
+  });
+const passwordSchema = z.string().min(12).max(128);
+const emailSchema = z.string().trim().email().max(254);
+async function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const derived = await scrypt(password, salt, 64, {
+    N: 32768,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  });
+  return `scrypt$32768$${salt.toString("hex")}$${derived.toString("hex")}`;
+}
+async function verifyPassword(password: string, encoded: string) {
+  const [scheme, cost, saltHex, hashHex] = encoded.split("$");
+  if (
+    scheme !== "scrypt" ||
+    cost !== "32768" ||
+    !/^[a-f0-9]{32}$/.test(saltHex || "") ||
+    !/^[a-f0-9]{128}$/.test(hashHex || "")
+  )
+    return false;
+  const expected = Buffer.from(hashHex, "hex");
+  const actual = await scrypt(
+    password,
+    Buffer.from(saltHex, "hex"),
+    expected.length,
+    { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 },
+  );
+  return timingSafeEqual(actual, expected);
+}
 class HttpError extends Error {
   constructor(
     public statusCode: number,
@@ -30,12 +82,39 @@ class HttpError extends Error {
 }
 const parseReport = (row: Row) =>
   JSON.parse(String(row.data)) as ReportRevision;
+const geographyKey = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+const marketReferenceView = (row: Row): MarketReferenceSnapshot => ({
+  id: String(row.id),
+  geography: String(row.geography),
+  level: row.geography_level as MarketReferenceSnapshot["level"],
+  rentPerM2: Number(row.rent_per_m2),
+  asOf: String(row.as_of),
+  sampleSize: row.sample_size === null ? null : Number(row.sample_size),
+  dispersion: row.dispersion === null ? null : Number(row.dispersion),
+  sourceLabel: String(row.source_label),
+  usageTerms: String(row.usage_terms),
+  importedAt: String(row.imported_at),
+});
 
 export async function createApi(
   db: Database,
-  options: { webOrigin?: string; runWorker?: boolean } = {},
+  options: {
+    webOrigin?: string;
+    runWorker?: boolean;
+    authMode?: "local" | "accounts";
+    secureCookies?: boolean;
+  } = {},
 ) {
   const webOrigin = options.webOrigin || "http://127.0.0.1:4173";
+  const authMode = options.authMode || "local";
+  const secureCookies = options.secureCookies ?? false;
+  const dummyPasswordHash = await hashPassword(token());
   const app = Fastify({ logger: false, bodyLimit: 100_000, trustProxy: false });
   await app.register(cookie);
   await app.register(cors, {
@@ -81,6 +160,7 @@ export async function createApi(
     });
   });
   const attempts = new Map<string, { count: number; until: number }>();
+  const authAttempts = new Map<string, { count: number; until: number }>();
   app.addHook("onRequest", async (req) => {
     if (req.method === "OPTIONS") return;
     const key = req.ip,
@@ -106,6 +186,29 @@ export async function createApi(
     )
       throw new HttpError(403, "Origen no permitido.");
   });
+  function limitAuthAttempts(req: FastifyRequest) {
+    const time = Date.now();
+    const current = authAttempts.get(req.ip);
+    if (!current || current.until < time) {
+      authAttempts.set(req.ip, { count: 1, until: time + 60_000 });
+    } else if (++current.count > 8) {
+      throw new HttpError(429, "Demasiados intentos. Espera un minuto.");
+    }
+  }
+  async function createSession(ownerId: string, reply: FastifyReply) {
+    const raw = token();
+    await db.run(
+      "INSERT INTO sessions(hash,owner_id,expires_at) VALUES($1,$2,$3)",
+      [hash(raw), ownerId, new Date(Date.now() + 7 * 86400_000).toISOString()],
+    );
+    reply.setCookie("fl_session", raw, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: secureCookies,
+      path: "/",
+      maxAge: 7 * 86400,
+    });
+  }
   async function owner(req: FastifyRequest): Promise<string> {
     const bearer = req.headers.authorization;
     if (bearer) {
@@ -147,32 +250,107 @@ export async function createApi(
   }));
   app.get("/v1/session", async (req, reply) => {
     let valid = false;
+    let displayName = "Mi espacio local";
     if (req.cookies.fl_session) {
       const rows = await db.all(
-        "SELECT expires_at FROM sessions WHERE hash=$1",
+        "SELECT owner_id,expires_at FROM sessions WHERE hash=$1",
         [hash(req.cookies.fl_session)],
       );
       valid = !!rows[0] && String(rows[0].expires_at) > now();
+      if (valid && authMode === "accounts") {
+        const users = await db.all("SELECT email FROM users WHERE id=$1", [
+          rows[0].owner_id,
+        ]);
+        valid = !!users[0];
+        if (valid) displayName = String(users[0].email);
+      }
     }
-    if (!valid) {
-      const raw = token();
-      await db.run(
-        "INSERT INTO sessions(hash,owner_id,expires_at) VALUES($1,$2,$3)",
-        [
-          hash(raw),
-          "local-user",
-          new Date(Date.now() + 30 * 86400_000).toISOString(),
-        ],
-      );
-      reply.setCookie("fl_session", raw, {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: false,
-        path: "/",
-        maxAge: 30 * 86400,
+    if (authMode === "accounts") {
+      return { mode: authMode, authenticated: valid, displayName };
+    }
+    if (!valid) await createSession("local-user", reply);
+    return {
+      mode: "local",
+      authenticated: true,
+      displayName: "Mi espacio local",
+      marketProvider: false,
+    };
+  });
+  app.post("/v1/auth/register", async (req, reply) => {
+    if (authMode !== "accounts")
+      throw new HttpError(404, "El modo de cuentas no está habilitado.");
+    limitAuthAttempts(req);
+    const body = z
+      .object({ email: emailSchema, password: passwordSchema })
+      .parse(req.body);
+    const email = body.email.toLowerCase();
+    const id = randomUUID();
+    const passwordHash = await hashPassword(body.password);
+    try {
+      await db.transaction(async (tx) => {
+        await tx.run(
+          "INSERT INTO users(id,email,password_hash,created_at) VALUES($1,$2,$3,$4)",
+          [id, email, passwordHash, now()],
+        );
+        const raw = token();
+        await tx.run(
+          "INSERT INTO sessions(hash,owner_id,expires_at) VALUES($1,$2,$3)",
+          [hash(raw), id, new Date(Date.now() + 7 * 86400_000).toISOString()],
+        );
+        reply.setCookie("fl_session", raw, {
+          httpOnly: true,
+          sameSite: "strict",
+          secure: secureCookies,
+          path: "/",
+          maxAge: 7 * 86400,
+        });
       });
+    } catch (error) {
+      const duplicate = await db.all("SELECT id FROM users WHERE email=$1", [
+        email,
+      ]);
+      if (duplicate.length)
+        throw new HttpError(409, "No se pudo crear la cuenta con esos datos.");
+      throw error;
     }
-    return { mode: "local", displayName: "Mi espacio", marketProvider: false };
+    reply.code(201);
+    return { mode: authMode, authenticated: true, displayName: email };
+  });
+  app.post("/v1/auth/login", async (req, reply) => {
+    if (authMode !== "accounts")
+      throw new HttpError(404, "El modo de cuentas no está habilitado.");
+    limitAuthAttempts(req);
+    const body = z
+      .object({ email: emailSchema, password: passwordSchema })
+      .parse(req.body);
+    const rows = await db.all(
+      "SELECT id,email,password_hash FROM users WHERE email=$1",
+      [body.email.toLowerCase()],
+    );
+    const passwordValid = await verifyPassword(
+      body.password,
+      String(rows[0]?.password_hash || dummyPasswordHash),
+    );
+    if (!rows[0] || !passwordValid)
+      throw new HttpError(401, "Correo o contraseña incorrectos.");
+    await createSession(String(rows[0].id), reply);
+    return {
+      mode: authMode,
+      authenticated: true,
+      displayName: String(rows[0].email),
+    };
+  });
+  app.post("/v1/auth/logout", async (req, reply) => {
+    if (req.cookies.fl_session)
+      await db.run("DELETE FROM sessions WHERE hash=$1", [
+        hash(req.cookies.fl_session),
+      ]);
+    reply.clearCookie("fl_session", {
+      path: "/",
+      sameSite: "strict",
+      secure: secureCookies,
+    });
+    return { ok: true };
   });
   app.post("/v1/pairing", async (req) => {
     const who = await owner(req),
@@ -439,14 +617,60 @@ export async function createApi(
   app.post<{ Params: { id: string } }>(
     "/v1/reports/:id/scenarios",
     async (req, reply) => {
-      const who = await owner(req),
-        base = await reportFor(req.params.id, who),
-        scenario = scenarioSchema.parse(req.body);
+      const who = await owner(req);
+      const base = await reportFor(req.params.id, who);
+      const parsed = z
+        .union([
+          scenarioSchema,
+          z.object({
+            scenario: scenarioSchema,
+            marketReferenceId: z.string().uuid().nullable().optional(),
+          }),
+        ])
+        .parse(req.body);
+      const scenario = "scenario" in parsed ? parsed.scenario : parsed;
+      let marketReference: MarketReferenceSnapshot | undefined;
+      if ("scenario" in parsed && parsed.marketReferenceId) {
+        const rows = await db.all(
+          "SELECT * FROM market_references WHERE id=$1 AND owner_id=$2",
+          [parsed.marketReferenceId, who],
+        );
+        if (!rows[0])
+          throw new HttpError(404, "Referencia de mercado no encontrada.");
+        const candidate = marketReferenceView(rows[0]);
+        if (
+          !base.snapshot.area ||
+          geographyKey(candidate.geography) !==
+            geographyKey(base.snapshot.location)
+        )
+          throw new HttpError(
+            422,
+            "La referencia no corresponde exactamente a la zona y superficie del anuncio.",
+          );
+        if (detectRisks(base.snapshot).some((risk) => risk.needsContractRent))
+          throw new HttpError(
+            422,
+            "No apliques una renta zonal a un inmueble con condiciones contractuales pendientes.",
+          );
+        const expectedRent = Math.round(
+          base.snapshot.area * candidate.rentPerM2,
+        );
+        if (
+          scenario.rent === null ||
+          Math.abs(scenario.rent - expectedRent) > 1
+        )
+          throw new HttpError(
+            422,
+            "El alquiler del escenario debe coincidir con la referencia elegida por superficie.",
+          );
+        marketReference = candidate;
+      }
       const revision = createReport(base.snapshot, scenario, {
         id: randomUUID(),
         propertyId: base.propertyId,
         parentId: base.id,
         createdAt: now(),
+        ...(marketReference ? { marketReference } : {}),
       });
       await db.transaction(async (tx) => {
         await tx.run(
@@ -525,6 +749,62 @@ export async function createApi(
         .header("Referrer-Policy", "no-referrer")
         .header("Cache-Control", "no-store");
       return parseReport(rows[0]);
+    },
+  );
+  app.get("/v1/market-references", async (req) => {
+    const who = await owner(req);
+    const rows = await db.all(
+      "SELECT * FROM market_references WHERE owner_id=$1 ORDER BY as_of DESC, imported_at DESC LIMIT 1000",
+      [who],
+    );
+    return rows.map(marketReferenceView);
+  });
+  app.post("/v1/market-references/import", async (req, reply) => {
+    const who = await owner(req);
+    const body = z
+      .object({
+        authorized: z.literal(true),
+        references: z.array(marketReferenceInputSchema).min(1).max(200),
+      })
+      .parse(req.body);
+    const importedAt = now();
+    const references = body.references.map((reference) => ({
+      ...reference,
+      id: randomUUID(),
+      importedAt,
+    }));
+    await db.transaction(async (tx) => {
+      for (const reference of references)
+        await tx.run(
+          "INSERT INTO market_references(id,owner_id,geography,geography_key,geography_level,rent_per_m2,as_of,sample_size,dispersion,source_label,usage_terms,imported_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+          [
+            reference.id,
+            who,
+            reference.geography,
+            geographyKey(reference.geography),
+            reference.level,
+            reference.rentPerM2,
+            reference.asOf,
+            reference.sampleSize,
+            reference.dispersion,
+            reference.sourceLabel,
+            reference.usageTerms,
+            reference.importedAt,
+          ],
+        );
+    });
+    reply.code(201);
+    return { imported: references.length, references };
+  });
+  app.delete<{ Params: { id: string } }>(
+    "/v1/market-references/:id",
+    async (req) => {
+      const who = await owner(req);
+      await db.run(
+        "DELETE FROM market_references WHERE id=$1 AND owner_id=$2",
+        [req.params.id, who],
+      );
+      return { ok: true };
     },
   );
   app.get("/v1/shares", async (req) => {

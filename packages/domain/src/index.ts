@@ -7,6 +7,7 @@ import {
   type ReportRevision,
   type ObservedValue,
   type ScoreFactor,
+  type MarketReferenceSnapshot,
 } from "@fincalens/contracts";
 
 export const CALC_VERSION = "1.0.0";
@@ -279,6 +280,7 @@ export function createReport(
     propertyId: string;
     createdAt: string;
     parentId?: string;
+    marketReference?: MarketReferenceSnapshot;
   },
 ): ReportRevision {
   const risks = detectRisks(snapshot),
@@ -286,6 +288,10 @@ export function createReport(
       ? scenarioSchema.parse(input)
       : defaultScenario(snapshot, risks);
   const result = calculate(scenario, snapshot, risks);
+  if (identity.marketReference)
+    result.warnings.push(
+      "La renta del escenario se calculó a partir de una referencia zonal que elegiste. No equivale a una renta contractual ni a una oferta para este inmueble.",
+    );
   const values: ReportRevision["values"] = {};
   const value = (
     key: string,
@@ -329,16 +335,29 @@ export function createReport(
     "Precio del escenario",
   );
   const rentUnchanged = scenario.rent === snapshot.rent;
+  const marketEvidence = identity.marketReference;
   value(
     "rent",
     scenario.rent,
     scenario.rent === null
       ? "default"
-      : rentUnchanged && snapshot.rentSource === "example"
-        ? "example"
-        : "user",
-    "Renta aportada o desconocida; sin proveedor de mercado",
+      : marketEvidence
+        ? "market"
+        : rentUnchanged && snapshot.rentSource === "example"
+          ? "example"
+          : "user",
+    marketEvidence
+      ? `Referencia ${marketEvidence.sourceLabel} · ${marketEvidence.geography} · ${marketEvidence.asOf}`
+      : "Renta aportada o desconocida; sin proveedor de mercado",
+    marketEvidence ? ["area", "marketReference.rentPerM2"] : undefined,
   );
+  if (marketEvidence) {
+    values.rent.observedAt = `${marketEvidence.asOf}T00:00:00.000Z`;
+    values.rent.confidence =
+      marketEvidence.sampleSize !== null && marketEvidence.sampleSize >= 30
+        ? "medium"
+        : "low";
+  }
   value(
     "netYield",
     result.netYield,
@@ -385,9 +404,11 @@ export function createReport(
       text: `Comprobar: ${r.title.toLocaleLowerCase("es")}.`,
     })),
   ];
+  const { marketReference: _marketReference, ...reportIdentity } = identity;
   return {
-    ...identity,
+    ...reportIdentity,
     parentId: identity.parentId ?? null,
+    marketReference: marketEvidence ?? null,
     snapshot,
     scenario,
     result,
