@@ -24,6 +24,8 @@ import {
   type ComparableListingSnapshot,
   type MarketComparable,
   type MarketReferenceSnapshot,
+  saleAreaReferenceInputSchema,
+  type SaleAreaReferenceSnapshot,
 } from "@fincalens/contracts";
 import {
   CALC_VERSION,
@@ -106,6 +108,17 @@ const marketReferenceView = (row: Row): MarketReferenceSnapshot => ({
   asOf: String(row.as_of),
   sampleSize: row.sample_size === null ? null : Number(row.sample_size),
   dispersion: row.dispersion === null ? null : Number(row.dispersion),
+  sourceLabel: String(row.source_label),
+  usageTerms: String(row.usage_terms),
+  importedAt: String(row.imported_at),
+});
+const saleAreaReferenceView = (row: Row): SaleAreaReferenceSnapshot => ({
+  id: String(row.id),
+  geography: String(row.geography),
+  level: row.geography_level as SaleAreaReferenceSnapshot["level"],
+  salePricePerM2: Number(row.sale_price_per_m2),
+  asOf: String(row.as_of),
+  sampleSize: row.sample_size === null ? null : Number(row.sample_size),
   sourceLabel: String(row.source_label),
   usageTerms: String(row.usage_terms),
   importedAt: String(row.imported_at),
@@ -940,6 +953,61 @@ export async function createApi(
       const who = await owner(req);
       await db.run(
         "DELETE FROM market_references WHERE id=$1 AND owner_id=$2",
+        [req.params.id, who],
+      );
+      return { ok: true };
+    },
+  );
+  app.get("/v1/sale-area-references", async (req) => {
+    const who = await owner(req);
+    const rows = await db.all(
+      "SELECT * FROM sale_area_references WHERE owner_id=$1 ORDER BY as_of DESC, imported_at DESC LIMIT 1000",
+      [who],
+    );
+    return rows.map(saleAreaReferenceView);
+  });
+  app.post("/v1/sale-area-references/import", async (req, reply) => {
+    const who = await owner(req);
+    const body = z
+      .object({
+        authorized: z.literal(true),
+        references: z.array(saleAreaReferenceInputSchema).min(1).max(200),
+      })
+      .parse(req.body);
+    const importedAt = now();
+    const references = body.references.map((reference) => ({
+      ...reference,
+      id: randomUUID(),
+      importedAt,
+    }));
+    await db.transaction(async (tx) => {
+      for (const reference of references)
+        await tx.run(
+          "INSERT INTO sale_area_references(id,owner_id,geography,geography_key,geography_level,sale_price_per_m2,as_of,sample_size,source_label,usage_terms,imported_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+          [
+            reference.id,
+            who,
+            reference.geography,
+            geographyKey(reference.geography),
+            reference.level,
+            reference.salePricePerM2,
+            reference.asOf,
+            reference.sampleSize,
+            reference.sourceLabel,
+            reference.usageTerms,
+            reference.importedAt,
+          ],
+        );
+    });
+    reply.code(201);
+    return { imported: references.length, references };
+  });
+  app.delete<{ Params: { id: string } }>(
+    "/v1/sale-area-references/:id",
+    async (req) => {
+      const who = await owner(req);
+      await db.run(
+        "DELETE FROM sale_area_references WHERE id=$1 AND owner_id=$2",
         [req.params.id, who],
       );
       return { ok: true };

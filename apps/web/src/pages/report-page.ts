@@ -5,6 +5,7 @@ import type {
   MarketReferenceSnapshot,
   ReportRevision,
   Scenario,
+  SaleAreaReferenceSnapshot,
 } from "@fincalens/contracts";
 import type { PropertySummary } from "@fincalens/contracts";
 import { calculate, preset } from "@fincalens/domain";
@@ -21,6 +22,7 @@ export class ReportPage extends FincaPage {
     propertyNotes: { state: true },
     observations: { state: true },
     marketReferences: { state: true },
+    saleReferences: { state: true },
     selectedMarketReference: { state: true },
   };
   declare report: ReportRevision | null;
@@ -32,6 +34,7 @@ export class ReportPage extends FincaPage {
   declare propertyNotes: string;
   declare observations: PropertySummary["observations"];
   declare marketReferences: MarketReferenceSnapshot[];
+  declare saleReferences: SaleAreaReferenceSnapshot[];
   declare selectedMarketReference: string;
   constructor() {
     super();
@@ -44,6 +47,7 @@ export class ReportPage extends FincaPage {
     this.propertyNotes = "";
     this.observations = [];
     this.marketReferences = [];
+    this.saleReferences = [];
     this.selectedMarketReference = "";
   }
   private get reportIdFromHash() {
@@ -55,13 +59,15 @@ export class ReportPage extends FincaPage {
         `/v1/reports/${encodeURIComponent(this.reportIdFromHash)}`,
       );
       this.scenario = { ...this.report.scenario };
-      const [checks, properties, marketReferences] = await Promise.all([
-        api<Record<string, boolean>>(
-          `/v1/checklists/${this.report.propertyId}`,
-        ),
-        api<PropertySummary[]>("/v1/properties"),
-        api<MarketReferenceSnapshot[]>("/v1/market-references"),
-      ]);
+      const [checks, properties, marketReferences, saleReferences] =
+        await Promise.all([
+          api<Record<string, boolean>>(
+            `/v1/checklists/${this.report.propertyId}`,
+          ),
+          api<PropertySummary[]>("/v1/properties"),
+          api<MarketReferenceSnapshot[]>("/v1/market-references"),
+          api<SaleAreaReferenceSnapshot[]>("/v1/sale-area-references"),
+        ]);
       this.checks = checks;
       const property = properties.find(
         (item) => item.id === this.report?.propertyId,
@@ -69,6 +75,7 @@ export class ReportPage extends FincaPage {
       this.propertyNotes = property?.notes || "";
       this.observations = property?.observations || [];
       this.marketReferences = marketReferences;
+      this.saleReferences = saleReferences;
       this.selectedMarketReference = "";
       this.shareUrl = "";
       this.error = "";
@@ -325,6 +332,14 @@ export class ReportPage extends FincaPage {
                 <small>Capital inicial</small
                 ><strong>${previewValid ? euro(preview.capital) : "—"}</strong>
               </div>
+            </div>
+            <div class="report-disclaimer">
+              ${previewValid && preview.equilibriumPrice !== null
+                ? html`Precio máximo para flujo mensual de equilibrio:
+                    <strong>${euro(preview.equilibriumPrice)}</strong>. Es un
+                    umbral de este escenario, no una tasación ni una previsión
+                    de aceptación del vendedor.`
+                : "No se puede estimar un precio de equilibrio con estos datos."}
             </div>
             <div class="report-disclaimer">
               Puntuación limitada a los factores financieros documentados.
@@ -593,6 +608,51 @@ export class ReportPage extends FincaPage {
                 )}
               </section>`
             : ""}
+          <section class="panel report-section">
+            <h2>Referencia de venta de la zona</h2>
+            ${(() => {
+              const key = this.normalizeGeography(r.snapshot.location);
+              const reference = this.saleReferences
+                .filter(
+                  (item) => key === this.normalizeGeography(item.geography),
+                )
+                .sort(
+                  (a, b) =>
+                    [
+                      "neighborhood",
+                      "district",
+                      "municipality",
+                      "province",
+                    ].indexOf(a.level) -
+                    [
+                      "neighborhood",
+                      "district",
+                      "municipality",
+                      "province",
+                    ].indexOf(b.level),
+                )[0];
+              return reference
+                ? html`<div class="risk-row">
+                    <strong
+                      >${euro(reference.salePricePerM2)}/m² ·
+                      ${reference.level}</strong
+                    >
+                    <p>
+                      Referencia agregada de ${reference.geography}; no es una
+                      tasación. ${reference.sourceLabel} · datos de
+                      ${reference.asOf}${reference.sampleSize
+                        ? ` · muestra ${reference.sampleSize}`
+                        : ""}
+                    </p>
+                    <p>${reference.usageTerms}</p>
+                  </div>`
+                : html`<p class="form-note">
+                    No hay referencia de venta para la zona exacta de este
+                    anuncio. Puedes añadir una referencia autorizada en
+                    <a class="text-link" href="#!/mercado">Datos de mercado</a>.
+                  </p>`;
+            })()}
+          </section>
           <section class="panel report-section">
             <div class="panel-head">
               <h2>Checklist de verificación</h2>

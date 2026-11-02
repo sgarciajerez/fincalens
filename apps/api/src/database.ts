@@ -14,6 +14,8 @@ const schema = [
   "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS market_references (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, geography TEXT NOT NULL, geography_key TEXT NOT NULL, geography_level TEXT NOT NULL, rent_per_m2 REAL NOT NULL, as_of TEXT NOT NULL, sample_size INTEGER, dispersion REAL, source_label TEXT NOT NULL, usage_terms TEXT NOT NULL, imported_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS market_lookup ON market_references(owner_id,geography_key,as_of)",
+  "CREATE TABLE IF NOT EXISTS sale_area_references (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, geography TEXT NOT NULL, geography_key TEXT NOT NULL, geography_level TEXT NOT NULL, sale_price_per_m2 REAL NOT NULL, as_of TEXT NOT NULL, sample_size INTEGER, source_label TEXT NOT NULL, usage_terms TEXT NOT NULL, imported_at TEXT NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS sale_reference_lookup ON sale_area_references(owner_id,geography_key,as_of)",
   "CREATE TABLE IF NOT EXISTS property_comparables (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, listing_key TEXT, geography TEXT NOT NULL, geography_key TEXT NOT NULL, property_type TEXT NOT NULL, price REAL NOT NULL, area REAL NOT NULL, bedrooms INTEGER, observed_at TEXT NOT NULL, source_label TEXT NOT NULL, usage_terms TEXT NOT NULL, imported_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS comparable_lookup ON property_comparables(owner_id,geography_key,property_type,observed_at)",
   "CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, owner_id TEXT NOT NULL, expires_at TEXT NOT NULL)",

@@ -6,6 +6,8 @@ import type {
   MarketReferenceSnapshot,
   ComparableListingInput,
   ComparableListingSnapshot,
+  SaleAreaReferenceInput,
+  SaleAreaReferenceSnapshot,
 } from "@fincalens/contracts";
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -48,25 +50,58 @@ export class MarketPage extends FincaPage {
     error: { state: true },
     busy: { state: true },
     comparables: { state: true },
+    saleReferences: { state: true },
   };
   declare references: MarketReferenceSnapshot[];
   declare error: string;
   declare busy: boolean;
   declare comparables: ComparableListingSnapshot[];
+  declare saleReferences: SaleAreaReferenceSnapshot[];
   constructor() {
     super();
     this.references = [];
     this.error = "";
     this.busy = false;
     this.comparables = [];
+    this.saleReferences = [];
   }
   protected async load() {
     try {
-      [this.references, this.comparables] = await Promise.all([
-        api<MarketReferenceSnapshot[]>("/v1/market-references"),
-        api<ComparableListingSnapshot[]>("/v1/comparables"),
-      ]);
+      [this.references, this.comparables, this.saleReferences] =
+        await Promise.all([
+          api<MarketReferenceSnapshot[]>("/v1/market-references"),
+          api<ComparableListingSnapshot[]>("/v1/comparables"),
+          api<SaleAreaReferenceSnapshot[]>("/v1/sale-area-references"),
+        ]);
       this.error = "";
+    } catch (error) {
+      this.error = this.message(error);
+    }
+  }
+  private async submitSaleReference(event: SubmitEvent) {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    if (!data.get("authorized")) return;
+    const reference: SaleAreaReferenceInput = {
+      geography: String(data.get("geography")),
+      level: String(data.get("level")) as SaleAreaReferenceInput["level"],
+      salePricePerM2: Number(data.get("salePricePerM2")),
+      asOf: String(data.get("asOf")),
+      sampleSize: data.get("sampleSize")
+        ? Number(data.get("sampleSize"))
+        : null,
+      sourceLabel: String(data.get("sourceLabel")),
+      usageTerms: String(data.get("usageTerms")),
+    };
+    try {
+      await api("/v1/sale-area-references/import", {
+        method: "POST",
+        body: JSON.stringify({ authorized: true, references: [reference] }),
+      });
+      form.reset();
+      await this.load();
+      notify("Referencia de venta guardada.");
     } catch (error) {
       this.error = this.message(error);
     }
@@ -228,7 +263,7 @@ export class MarketPage extends FincaPage {
     return html`<header class="page-head">
         <div>
           <div class="eyebrow">DATOS APORTADOS POR TI</div>
-          <h1>Referencias de alquiler</h1>
+          <h1>Referencias de zona</h1>
           <p class="subtitle">
             Guarda fuentes de alquiler que tengas derecho a usar. Se aplican a
             los informes solo cuando eliges una coincidencia exacta de zona.
@@ -239,6 +274,94 @@ export class MarketPage extends FincaPage {
         ? html`<div role="alert" class="banner-note">${this.error}</div>`
         : ""}
       <div class="market-grid">
+        <section class="panel">
+          <h2>Referencia de precio de venta</h2>
+          <p class="form-note">
+            Guarda una media zonal con fuente, fecha y permiso de uso. Se
+            mostrará como referencia agregada, no como tasación.
+          </p>
+          <form
+            class="form-grid"
+            @submit=${(event: SubmitEvent) => this.submitSaleReference(event)}
+          >
+            <label class="field"
+              ><span>Zona</span
+              ><input name="geography" required minlength="2" maxlength="160"
+            /></label>
+            <label class="field"
+              ><span>Nivel</span
+              ><select name="level">
+                <option value="neighborhood">Barrio</option>
+                <option value="district">Distrito</option>
+                <option value="municipality">Municipio</option>
+                <option value="province">Provincia</option>
+              </select></label
+            >
+            <label class="field"
+              ><span>Venta €/m²</span
+              ><input
+                name="salePricePerM2"
+                type="number"
+                min="10"
+                max="100000"
+                step="1"
+                required
+            /></label>
+            <label class="field"
+              ><span>Fecha de los datos</span
+              ><input name="asOf" type="date" required
+            /></label>
+            <label class="field"
+              ><span>Tamaño de muestra</span
+              ><input
+                name="sampleSize"
+                type="number"
+                min="1"
+                placeholder="Opcional"
+            /></label>
+            <label class="field"
+              ><span>Fuente</span
+              ><input name="sourceLabel" required minlength="2" maxlength="120"
+            /></label>
+            <label class="field"
+              ><span>Licencia o condiciones</span
+              ><input name="usageTerms" required minlength="12" maxlength="500"
+            /></label>
+            <label class="checklist-row market-consent"
+              ><input name="authorized" type="checkbox" required /><span
+                >Confirmo que puedo usar estos datos.</span
+              ></label
+            >
+            <button class="btn btn-primary" ?disabled=${this.busy}>
+              Guardar referencia de venta
+            </button>
+          </form>
+          <div class="market-list">
+            ${this.saleReferences.map(
+              (item) =>
+                html`<article class="market-row">
+                  <div>
+                    <strong>${item.geography}</strong>
+                    <p>
+                      ${item.salePricePerM2.toLocaleString("es-ES")} €/m² ·
+                      ${item.level} · ${item.asOf} · ${item.sourceLabel}
+                    </p>
+                  </div>
+                  <button
+                    class="btn btn-sm"
+                    @click=${async () => {
+                      await api(`/v1/sale-area-references/${item.id}`, {
+                        method: "DELETE",
+                      });
+                      await this.load();
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                </article>`,
+            )}
+          </div>
+        </section>
         <section class="panel">
           <div class="panel-head">
             <div>

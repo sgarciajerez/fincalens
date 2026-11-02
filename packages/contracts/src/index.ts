@@ -168,6 +168,22 @@ export interface MarketReferenceSnapshot extends MarketReferenceInput {
   id: string;
   importedAt: string;
 }
+export const saleAreaReferenceInputSchema = z.object({
+  geography: z.string().trim().min(2).max(160),
+  level: z.enum(["neighborhood", "district", "municipality", "province"]),
+  salePricePerM2: z.number().finite().min(10).max(100_000),
+  asOf: z.string().date(),
+  sampleSize: z.number().int().min(1).max(1_000_000).nullable().default(null),
+  sourceLabel: z.string().trim().min(2).max(120),
+  usageTerms: z.string().trim().min(12).max(500),
+});
+export type SaleAreaReferenceInput = z.infer<
+  typeof saleAreaReferenceInputSchema
+>;
+export interface SaleAreaReferenceSnapshot extends SaleAreaReferenceInput {
+  id: string;
+  importedAt: string;
+}
 export const comparableListingInputSchema = z.object({
   listingKey: z.string().trim().min(3).max(500).optional(),
   geography: z.string().trim().min(2).max(160),
