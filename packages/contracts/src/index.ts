@@ -142,6 +142,7 @@ export interface PropertySummary {
   reportId: string;
   title: string;
   location: string;
+  url: string | null;
   price: number;
   area: number | null;
   rent: number | null;

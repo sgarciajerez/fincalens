@@ -4,7 +4,7 @@ import {
   normalizeIdealista,
   type RawCapture,
 } from "../../../packages/portal-adapters/src/idealista.js";
-import type { AnalysisJob } from "@fincalens/contracts";
+import type { AnalysisJob, PropertySummary } from "@fincalens/contracts";
 
 const API = "http://127.0.0.1:4174/v1";
 const connection = document.querySelector<HTMLElement>("#connection")!;
@@ -81,6 +81,38 @@ async function render() {
     button.addEventListener("click", () => void runAnalysis(token, button));
     analyze.append(title, desc, button);
     capture.append(analyze);
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (tab?.url && isIdealistaListing(tab.url)) {
+      try {
+        const properties = await json<PropertySummary[]>("/properties", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const current = properties.find(
+          (item) =>
+            item.url &&
+            new URL(item.url).pathname === new URL(tab.url!).pathname,
+        );
+        if (current && current.observations.length > 1) {
+          const first = current.observations[0]!;
+          const last = current.observations.at(-1)!;
+          const change = first.price - last.price;
+          const signal = document.createElement("p");
+          signal.className = "muted";
+          signal.textContent =
+            change > 0
+              ? `Precio observado: bajó ${change.toLocaleString("es-ES")} € desde ${new Date(first.observedAt).toLocaleDateString("es-ES")}. Última observación: ${new Date(last.observedAt).toLocaleDateString("es-ES")}.`
+              : change < 0
+                ? `Precio observado: subió ${Math.abs(change).toLocaleString("es-ES")} € desde ${new Date(first.observedAt).toLocaleDateString("es-ES")}.`
+                : `Precio sin cambios entre ${current.observations.length} observaciones. La última fue ${new Date(last.observedAt).toLocaleDateString("es-ES")}.`;
+          analyze.insertBefore(signal, button);
+        }
+      } catch {
+        // A history lookup should not prevent capturing the current listing.
+      }
+    }
   } else {
     const card = document.createElement("form");
     card.className = "panel";

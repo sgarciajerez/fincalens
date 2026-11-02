@@ -607,6 +607,7 @@ export async function createApi(
           reportId: String(row.report_id),
           title: report.snapshot.title,
           location: report.snapshot.location,
+          url: report.snapshot.url,
           price: report.snapshot.price,
           area: report.snapshot.area,
           rent: report.snapshot.rent,
