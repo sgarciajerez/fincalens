@@ -85,8 +85,22 @@ async function render() {
       active: true,
       currentWindow: true,
     });
-    if (tab?.url && isIdealistaListing(tab.url)) {
+    if (tab?.id && tab.url && isIdealistaListing(tab.url)) {
       try {
+        const [captured] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: captureIdealistaDocument,
+        });
+        const snapshot = normalizeIdealista(captured.result as RawCapture);
+        await json("/observations", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            url: snapshot.url,
+            price: snapshot.price,
+            observedAt: snapshot.capturedAt,
+          }),
+        });
         const properties = await json<PropertySummary[]>("/properties", {
           headers: { authorization: `Bearer ${token}` },
         });

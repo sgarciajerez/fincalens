@@ -626,6 +626,69 @@ export async function createApi(
       }),
     );
   });
+  app.post("/v1/observations", async (req) => {
+    const who = await owner(req);
+    const body = z
+      .object({
+        url: z.string().url().max(2048),
+        price: z.number().finite().min(1000).max(100_000_000),
+        observedAt: z.string().datetime(),
+      })
+      .parse(req.body);
+    const url = new URL(body.url);
+    if (
+      url.protocol !== "https:" ||
+      !/^(www\.)?idealista\.com$/.test(url.hostname) ||
+      !/^\/inmueble\/\d+\/?$/.test(url.pathname)
+    )
+      throw new HttpError(
+        422,
+        "Solo se admiten observaciones de anuncios públicos de Idealista.",
+      );
+    const canonical = `https://www.idealista.com${url.pathname.replace(/\/?$/, "/")}`;
+    const rows = await db.all(
+      "SELECT p.id FROM properties p WHERE p.owner_id=$1 AND p.canonical_key=$2",
+      [who, canonical],
+    );
+    if (!rows[0]) return { tracked: false, recorded: false };
+    const propertyId = String(rows[0].id);
+    const latest = await db.all(
+      "SELECT price,observed_at FROM observations WHERE property_id=$1 AND owner_id=$2 ORDER BY observed_at DESC LIMIT 1",
+      [propertyId, who],
+    );
+    const previous = latest[0];
+    const samePrice = previous && Number(previous.price) === body.price;
+    const withinSixHours =
+      previous &&
+      Date.parse(body.observedAt) - Date.parse(String(previous.observed_at)) <
+        6 * 60 * 60 * 1000;
+    const recorded = !samePrice || !withinSixHours;
+    if (recorded)
+      await db.run(
+        "INSERT INTO observations(id,owner_id,property_id,price,observed_at) VALUES($1,$2,$3,$4,$5)",
+        [randomUUID(), who, propertyId, body.price, body.observedAt],
+      );
+    const history = await db.all(
+      "SELECT price,observed_at FROM observations WHERE property_id=$1 AND owner_id=$2 ORDER BY observed_at DESC LIMIT 2",
+      [propertyId, who],
+    );
+    return {
+      tracked: true,
+      recorded,
+      latest: history[0]
+        ? {
+            price: Number(history[0].price),
+            observedAt: String(history[0].observed_at),
+          }
+        : { price: body.price, observedAt: body.observedAt },
+      previous: history[1]
+        ? {
+            price: Number(history[1].price),
+            observedAt: String(history[1].observed_at),
+          }
+        : null,
+    };
+  });
   app.patch<{ Params: { id: string } }>("/v1/properties/:id", async (req) => {
     const who = await owner(req),
       body = z
